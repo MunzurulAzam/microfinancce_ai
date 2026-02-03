@@ -1,0 +1,188 @@
+.upload-container {
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.upload-header {
+    text-align: center;
+}
+
+.upload-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.upload-subtitle {
+    color: var(--text-secondary);
+    font-size: 1rem;
+}
+
+.upload-card {
+    padding: 2rem;
+}
+
+.dropzone {
+    border: 2px dashed var(--glass-border);
+    border-radius: var(--radius-xl);
+    padding: 3rem 2rem;
+    text-align: center;
+    transition: all var(--transition-base);
+    cursor: pointer;
+    background: var(--bg-secondary);
+}
+
+.dropzone-active {
+    border-color: rgba(102, 126, 234, 0.5);
+    background: rgba(102, 126, 234, 0.05);
+    transform: scale(1.02);
+}
+
+.dropzone-has-file {
+    border-color: var(--accent-success);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.file-input {
+    display: none;
+}
+
+.dropzone-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.dropzone-icon {
+    color: var(--text-secondary);
+    stroke-width: 1.5;
+}
+
+.dropzone-icon.success {
+    color: var(--accent-success);
+}
+
+.dropzone-text {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+}
+
+.dropzone-highlight {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.dropzone-hint {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.dropzone-filename {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.dropzone-filesize {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.upload-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.result-card {
+    display: flex;
+    gap: 1rem;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.result-icon {
+    flex-shrink: 0;
+    color: var(--accent-danger);
+}
+
+.result-icon.success {
+    color: var(--accent-success);
+}
+
+.result-content {
+    flex: 1;
+}
+
+.result-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.result-text {
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.success-card {
+    border-color: var(--accent-success);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.error-card {
+    border-color: var(--accent-danger);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+}
+
+.stat-label {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stat-value {
+    color: var(--text-primary);
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .upload-title {
+        font-size: 1.5rem;
+    }
+
+    .upload-card {
+        padding: 1.5rem;
+    }
+
+    .dropzone {
+        padding: 2rem 1rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
