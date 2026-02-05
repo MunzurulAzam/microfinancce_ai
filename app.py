@@ -21,6 +21,10 @@ def create_app(config_class=Config):
     # Enable CORS
     CORS(app, resources={r"/api/*": {"origins": config_class.CORS_ORIGINS}})
     
+    # Auto-load data if available
+    from services.data_processor import data_processor
+    data_processor.auto_load()
+    
     # Register blueprints
     app.register_blueprint(data_bp, url_prefix='/api')
     app.register_blueprint(analysis_bp, url_prefix='/api/analyze')

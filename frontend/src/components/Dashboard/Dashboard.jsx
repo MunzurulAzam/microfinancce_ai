@@ -41,7 +41,8 @@ const Dashboard = () => {
     if (!stats) {
         return (
             <div className="empty-state">
-                <p>No data available. Please upload a CSV file first.</p>
+                <p>No data available. Please upload a CSV file in the Upload page to start analysis.</p>
+                <p className="empty-state-hint">The system will automatically load the default dataset if available on server startup.</p>
             </div>
         );
     }

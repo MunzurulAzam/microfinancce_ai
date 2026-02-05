@@ -16,6 +16,24 @@ class DataProcessor:
     def __init__(self):
         self.df_original = None
         self.df_processed = None
+        self.is_auto_loaded = False
+        
+    def auto_load(self):
+        """Automatically load the default dataset if it exists"""
+        import os
+        from config import Config
+        
+        default_file = os.path.join(Config.UPLOAD_FOLDER, 'master_data_for_ml.csv')
+        if os.path.exists(default_file):
+            print(f"🔄 Auto-loading default dataset: {default_file}")
+            success, message = self.load_data(default_file)
+            if success:
+                self.is_auto_loaded = True
+                print(f"✅ Default dataset loaded successfully!")
+            else:
+                print(f"⚠️ Failed to auto-load default dataset: {message}")
+        else:
+            print(f"ℹ️ No default dataset found at {default_file}. Waiting for manual upload.")
         
     def _normalize_columns(self, df):
         """Map common variations of column names to standard names"""
