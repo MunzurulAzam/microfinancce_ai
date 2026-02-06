@@ -3,6 +3,7 @@ import Layout from './components/Layout/Layout';
 import ChatInterface from './components/Ask/ChatInterface';
 import FileUpload from './components/Upload/FileUpload';
 import Dashboard from './components/Dashboard/Dashboard';
+import EvaluationForm from './components/Evaluation/EvaluationForm';
 import './styles/globals.css';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
           <Route index element={<ChatInterface />} />
           <Route path="upload" element={<FileUpload />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="evaluation" element={<EvaluationForm />} />
           <Route path="clients" element={<ComingSoon page="Clients" />} />
           <Route path="risk" element={<ComingSoon page="Risk Analysis" />} />
           <Route path="*" element={<Navigate to="/" replace />} />

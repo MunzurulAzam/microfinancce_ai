@@ -6,7 +6,7 @@ Microfinance AI Analysis API
 from flask import Flask, jsonify
 from flask_cors import CORS
 from config import Config
-from routes import data_bp, analysis_bp, ask_bp
+from routes import data_bp, analysis_bp, ask_bp, evaluation_bp
 
 
 def create_app(config_class=Config):
@@ -29,6 +29,7 @@ def create_app(config_class=Config):
     app.register_blueprint(data_bp, url_prefix='/api')
     app.register_blueprint(analysis_bp, url_prefix='/api/analyze')
     app.register_blueprint(ask_bp, url_prefix='/api')  # Conversational endpoint
+    app.register_blueprint(evaluation_bp, url_prefix='/api')
     
     # Root endpoint
     @app.route('/')
