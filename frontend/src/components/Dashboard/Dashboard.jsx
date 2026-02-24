@@ -56,8 +56,8 @@ const Dashboard = () => {
 
             <div className="stats-cards">
                 <Card className="stat-card">
-                    <div className="stat-icon" style={{ background: 'rgba(102, 126, 234, 0.2)' }}>
-                        <Users size={24} color="#667eea" />
+                    <div className="stat-icon" style={{ background: 'rgba(245, 158, 11, 0.12)' }}>
+                        <Users size={24} color="#D97706" />
                     </div>
                     <div className="stat-content">
                         <p className="stat-label">Total Clients</p>
@@ -66,8 +66,8 @@ const Dashboard = () => {
                 </Card>
 
                 <Card className="stat-card">
-                    <div className="stat-icon" style={{ background: 'rgba(16, 185, 129, 0.2)' }}>
-                        <TrendingUp size={24} color="#10b981" />
+                    <div className="stat-icon" style={{ background: 'rgba(5, 150, 105, 0.12)' }}>
+                        <TrendingUp size={24} color="#059669" />
                     </div>
                     <div className="stat-content">
                         <p className="stat-label">Avg Performance</p>
@@ -76,8 +76,8 @@ const Dashboard = () => {
                 </Card>
 
                 <Card className="stat-card">
-                    <div className="stat-icon" style={{ background: 'rgba(79, 172, 254, 0.2)' }}>
-                        <DollarSign size={24} color="#4facfe" />
+                    <div className="stat-icon" style={{ background: 'rgba(251, 191, 36, 0.15)' }}>
+                        <DollarSign size={24} color="#B45309" />
                     </div>
                     <div className="stat-content">
                         <p className="stat-label">Total Portfolio</p>
@@ -88,8 +88,8 @@ const Dashboard = () => {
                 </Card>
 
                 <Card className="stat-card">
-                    <div className="stat-icon" style={{ background: 'rgba(239, 68, 68, 0.2)' }}>
-                        <AlertTriangle size={24} color="#ef4444" />
+                    <div className="stat-icon" style={{ background: 'rgba(220, 38, 38, 0.1)' }}>
+                        <AlertTriangle size={24} color="#DC2626" />
                     </div>
                     <div className="stat-content">
                         <p className="stat-label">Clients with Overdue</p>

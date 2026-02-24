@@ -88,13 +88,13 @@ def create_app(config_class=Config):
 
 if __name__ == '__main__':
     print("=" * 60)
-    print("🚀 MICROFINANCE AI ANALYSIS API")
+    print("MICROFINANCE AI ANALYSIS API")
     print("=" * 60)
     print("Starting Flask server...")
-    print("📡 Server will run on: http://localhost:5000")
-    print("📚 API Documentation: http://localhost:5000/")
-    print("💊 Health check: http://localhost:5000/health")
+    print("Server will run on: http://localhost:5001")
+    print("API Documentation: http://localhost:5001/")
+    print("Health check: http://localhost:5001/health")
     print("=" * 60)
     
     app = create_app()
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=True)

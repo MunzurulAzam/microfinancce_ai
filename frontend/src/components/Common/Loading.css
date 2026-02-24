@@ -1,6 +1,6 @@
 .loading-spinner {
-    border: 3px solid rgba(255, 255, 255, 0.1);
-    border-top-color: var(--accent-info);
+    border: 3px solid rgba(251, 191, 36, 0.15);
+    border-top-color: var(--yellow-500);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }

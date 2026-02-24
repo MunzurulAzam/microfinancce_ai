@@ -12,8 +12,9 @@
 
 .upload-title {
     font-size: 2rem;
-    font-weight: 700;
+    font-weight: 800;
     margin-bottom: 0.5rem;
+    color: var(--text-primary);
 }
 
 .upload-subtitle {
@@ -26,24 +27,26 @@
 }
 
 .dropzone {
-    border: 2px dashed var(--glass-border);
+    border: 2px dashed rgba(251, 191, 36, 0.35);
     border-radius: var(--radius-xl);
     padding: 3rem 2rem;
     text-align: center;
     transition: all var(--transition-base);
     cursor: pointer;
-    background: var(--bg-secondary);
+    background: var(--warm-100);
 }
 
 .dropzone-active {
-    border-color: rgba(102, 126, 234, 0.5);
-    background: rgba(102, 126, 234, 0.05);
+    border-color: var(--yellow-400);
+    background: rgba(251, 191, 36, 0.06);
     transform: scale(1.02);
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.1);
 }
 
 .dropzone-has-file {
     border-color: var(--accent-success);
-    background: rgba(16, 185, 129, 0.05);
+    background: rgba(5, 150, 105, 0.04);
+    border-style: solid;
 }
 
 .file-input {
@@ -59,7 +62,7 @@
 }
 
 .dropzone-icon {
-    color: var(--text-secondary);
+    color: var(--text-muted);
     stroke-width: 1.5;
 }
 
@@ -73,7 +76,7 @@
 }
 
 .dropzone-highlight {
-    color: var(--text-primary);
+    color: var(--yellow-600);
     font-weight: 600;
 }
 
@@ -123,6 +126,7 @@
     font-size: 1.125rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
+    color: var(--text-primary);
 }
 
 .result-text {
@@ -132,12 +136,12 @@
 
 .success-card {
     border-color: var(--accent-success);
-    background: rgba(16, 185, 129, 0.05);
+    background: rgba(5, 150, 105, 0.04);
 }
 
 .error-card {
     border-color: var(--accent-danger);
-    background: rgba(239, 68, 68, 0.05);
+    background: rgba(220, 38, 38, 0.04);
 }
 
 .stats-grid {
@@ -151,9 +155,10 @@
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    padding: 0.75rem;
-    background: var(--bg-secondary);
+    padding: 0.875rem;
+    background: var(--warm-100);
     border-radius: var(--radius-md);
+    border: 1px solid rgba(251, 191, 36, 0.1);
 }
 
 .stat-label {

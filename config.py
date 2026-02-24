@@ -8,7 +8,7 @@ class Config:
     DEBUG = True
     
     # CORS
-    CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5000']
+    CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5001']
     
     # Data
     DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
