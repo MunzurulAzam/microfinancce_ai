@@ -39,7 +39,7 @@ def create_app(config_class=Config):
             'version': '1.0.0',
             'endpoints': {
                 'conversational': {
-                    'POST /api/ask': '🤖 Ask any question in natural language (RECOMMENDED)'
+                    'POST /api/ask': 'Ask any question in natural language (RECOMMENDED)'
                 },
                 'data': {
                     'POST /api/upload': 'Upload CSV file',
