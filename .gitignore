@@ -24,3 +24,4 @@ models/*.gguf
 .vscode/
 .idea/
 *.log
+frontend/.env.local

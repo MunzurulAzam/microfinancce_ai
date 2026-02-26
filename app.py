@@ -18,8 +18,14 @@ def create_app(config_class=Config):
     # Initialize config
     config_class.init_app(app)
     
-    # Enable CORS
-    CORS(app, resources={r"/api/*": {"origins": config_class.CORS_ORIGINS}})
+    # Enable CORS — origins read from env var on Render (see config.py)
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": config_class.CORS_ORIGINS}},
+        supports_credentials=False,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "OPTIONS"],
+    )
     
     # Auto-load data if available
     from services.data_processor import data_processor

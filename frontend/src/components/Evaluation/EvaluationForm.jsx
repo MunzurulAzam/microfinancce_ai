@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Briefcase, Calendar, DollarSign, Home, Upload, FileText, CheckCircle, AlertCircle, Loader2, FileCheck } from 'lucide-react';
+import { evaluateApplicant } from '../../services/api';
 import './EvaluationForm.css';
 
 const EvaluationForm = () => {
@@ -42,24 +43,15 @@ const EvaluationForm = () => {
         setError(null);
         setResult(null);
 
-        const data = new FormData();
-        Object.keys(formData).forEach(key => data.append(key, formData[key]));
-        data.append('bankStatement', file);
-
         try {
-            const response = await fetch('https://microfinancce-ai.onrender.com/api/evaluate', {
-                method: 'POST',
-                body: data,
-            });
-
-            const resData = await response.json();
+            const resData = await evaluateApplicant(formData, file);
             if (resData.success) {
                 setResult(resData.data);
             } else {
                 setError(resData.error || 'Something went wrong');
             }
         } catch (err) {
-            setError('Failed to connect to the server');
+            setError(err?.error || 'Failed to connect to the server');
         } finally {
             setLoading(false);
         }

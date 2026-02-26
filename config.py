@@ -7,8 +7,10 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     DEBUG = True
     
-    # CORS
-    CORS_ORIGINS = ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5001']
+    # CORS — read from env var on Render (comma-separated), fall back to localhost for local dev
+    _cors_env = os.environ.get('CORS_ORIGINS', '')
+    CORS_ORIGINS = [o.strip() for o in _cors_env.split(',') if o.strip()] or \
+                   ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5001']
     
     # Data
     DATA_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
