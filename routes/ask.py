@@ -12,6 +12,9 @@ from services.performance import (
     get_quick_insights,
     get_business_performance
 )
+from services.db_connector import search_member, get_member_full_data
+from services.credit_scoring import calculate_credit_score
+from services.ollama_service import get_ai_analysis
 import re
 
 ask_bp = Blueprint('ask', __name__)
@@ -23,6 +26,22 @@ def parse_question(question):
     Returns: (intent, entity)
     """
     question_lower = question.lower().strip()
+    
+    # 0. Credit Score intent (highest priority)
+    credit_patterns = [
+        r'credit\s*scor(?:e|ing)\s+(?:for\s+)?(.+)',
+        r'score\s+(?:for\s+)?(?:client\s+)?(.+)',
+        r'scoring\s+(?:for\s+)?(.+)',
+        r'check\s+(?:credit\s+)?score\s+(?:for\s+|of\s+)?(.+)',
+        r'evaluate\s+credit\s+(?:for\s+)?(.+)',
+        r'credit\s+(?:check|analysis|report)\s+(?:for\s+)?(.+)',
+    ]
+    for p in credit_patterns:
+        match = re.search(p, question_lower)
+        if match:
+            entity = match.group(1).strip().rstrip('?.!')
+            if entity and len(entity) > 1:
+                return ('credit_score', entity)
     
     # 1. Direct Keyword Matching (Fast)
     
@@ -86,7 +105,10 @@ def get_answer(intent, entity, question):
     Get answer based on intent and entity
     """
     try:
-        if intent == 'analyze_client':
+        if intent == 'credit_score':
+            return _handle_credit_score(entity)
+
+        elif intent == 'analyze_client':
             if not entity:
                 return {
                     'success': False,
@@ -324,6 +346,7 @@ def get_answer(intent, entity, question):
                 'answer': """
 I can help you with the following:
 
+🎯 **Credit Score:** "Credit score for [name or ID]" ⭐ NEW
 📊 **View Statistics:** "Show stats" or "Total clients"
 👤 **Analyze Client:** "Analyze client [name]"
 👥 **Analyze Group:** "Analyze group [name]"  
@@ -341,6 +364,117 @@ What would you like to know?
             'success': False,
             'answer': f'Error: {str(e)}'
         }
+
+
+def _handle_credit_score(entity):
+    """
+    Handle credit scoring request.
+    Fetches data from MSSQL DB, calculates score, gets AI analysis.
+    """
+    if not entity:
+        return {
+            'success': False,
+            'answer': 'Please provide a client name, ID, or member code.\n'
+                      'Example: "Credit score for Nyakisiki Lydia" or "Score CLN0025881"'
+        }
+
+    try:
+        # Step 1: Search for the member
+        members = search_member(entity)
+
+        if not members:
+            return {
+                'success': False,
+                'answer': f'❌ No client found matching "{entity}".\n'
+                          f'Try using full name, Member ID, or Member Code (e.g. CLN0025881).'
+            }
+
+        # Use first match (best match)
+        member = members[0]
+        member_id = member['MemberId']
+
+        # Step 2: Fetch full data
+        full_data = get_member_full_data(member_id)
+        if not full_data:
+            return {
+                'success': False,
+                'answer': f'❌ Could not fetch full data for member ID {member_id}.'
+            }
+
+        # Step 3: Calculate credit score
+        score_result = calculate_credit_score(full_data)
+
+        # Step 4: Get AI analysis
+        ai_analysis = get_ai_analysis(score_result)
+        score_result['ai_analysis'] = ai_analysis
+
+        # Step 5: Format text response
+        answer = _format_credit_score_text(score_result)
+
+        # If multiple matches, note it
+        if len(members) > 1:
+            others = [f"{m['FirstName']} {m['LastName']} ({m['MemberCode']})" for m in members[1:5]]
+            answer += f"\n\n📋 Other matches: {', '.join(others)}"
+
+        return {
+            'success': True,
+            'answer': answer,
+            'data': score_result,
+            'credit_score': True
+        }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'answer': f'❌ Error calculating credit score: {str(e)}'
+        }
+
+
+def _format_credit_score_text(sr):
+    """Format credit score result as readable text for the chat."""
+    # Classification emoji
+    cls_emoji = {
+        'Excellent': '🟢',
+        'Good': '🔵',
+        'Moderate Risk': '🟡',
+        'High Risk': '🔴'
+    }
+    emoji = cls_emoji.get(sr['classification'], '⚪')
+
+    lines = [
+        f"🎯 **Credit Score Report — {sr['member_name']}** ({sr['member_code']})",
+        f"",
+        f"{'═' * 40}",
+        f"{emoji} **Overall: {sr['percentage']}% — {sr['classification']}**",
+        f"Total Score: {sr['total_score']} / {sr['max_score']}",
+        f"{'═' * 40}",
+        f"",
+        f"📋 **1. Client Scoring:** {sr['client_scoring']['score']}/{sr['client_scoring']['max']} ({sr['client_scoring']['percentage']}%)",
+    ]
+
+    # Show client details
+    for d in sr['client_scoring']['details']:
+        bar = '█' * d['score'] + '░' * (5 - d['score'])
+        lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
+
+    lines.append(f"")
+    lines.append(f"🏢 **2. Branch Performance:** {sr['branch_scoring']['score']}/{sr['branch_scoring']['max']} ({sr['branch_scoring']['percentage']}%) — {sr['branch_scoring']['branch_name']}")
+    for d in sr['branch_scoring']['details']:
+        bar = '█' * d['score'] + '░' * (5 - d['score'])
+        lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
+
+    lines.append(f"")
+    lines.append(f"👤 **3. Loan Officer:** {sr['lo_scoring']['score']}/{sr['lo_scoring']['max']} ({sr['lo_scoring']['percentage']}%) — {sr['lo_scoring']['lo_name']}")
+    for d in sr['lo_scoring']['details']:
+        bar = '█' * d['score'] + '░' * (5 - d['score'])
+        lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
+
+    lines.append(f"")
+    lines.append(f"{'─' * 40}")
+    lines.append(f"🤖 **AI Analysis:**")
+    lines.append(sr.get('ai_analysis', 'No AI analysis available.'))
+
+    return '\n'.join(lines)
 
 
 @ask_bp.route('/ask', methods=['POST'])

@@ -78,7 +78,7 @@
 }
 
 .message-bubble {
-    max-width: 80%;
+    max-width: 85%;
     padding: 0.875rem 1.125rem;
     border-radius: var(--radius-lg);
     position: relative;
@@ -243,6 +243,298 @@
     padding: 0.75rem 1.25rem !important;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   CREDIT SCORE CARD — Premium score visualization inside chat bubble
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.score-card {
+    width: 100%;
+    animation: scoreCardIn 0.5s ease-out;
+}
+
+@keyframes scoreCardIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.score-card-header {
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.score-card-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--yellow-700);
+    margin-bottom: 0.25rem;
+}
+
+.score-card-client {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.member-code {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-left: 0.35rem;
+}
+
+/* Gauge */
+.score-gauge-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    gap: 0.75rem;
+}
+
+.score-gauge {
+    position: relative;
+    width: 120px;
+    height: 120px;
+}
+
+.gauge-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.gauge-bg {
+    fill: none;
+    stroke: rgba(251, 191, 36, 0.12);
+    stroke-width: 8;
+}
+
+.gauge-fill {
+    fill: none;
+    stroke-width: 8;
+    stroke-linecap: round;
+    transition: stroke-dasharray 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: gaugeAnim 1.2s ease-out;
+}
+
+@keyframes gaugeAnim {
+    from {
+        stroke-dasharray: 0 326.73;
+    }
+}
+
+.gauge-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.gauge-percent {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.gauge-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.score-classification {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 1rem;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    border: 1.5px solid;
+}
+
+.score-total {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* Categories */
+.score-categories {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.score-cat {
+    background: white;
+    border: 1px solid rgba(251, 191, 36, 0.15);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: box-shadow var(--transition-base);
+}
+
+.score-cat:hover {
+    box-shadow: var(--shadow-sm);
+}
+
+.score-cat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.65rem 0.85rem;
+    cursor: pointer;
+    user-select: none;
+    gap: 0.75rem;
+}
+
+.score-cat-label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.score-cat-sub {
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+.score-cat-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+
+.score-cat-bar-bg {
+    width: 60px;
+    height: 6px;
+    background: rgba(251, 191, 36, 0.12);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.score-cat-bar-fill {
+    height: 100%;
+    background: var(--gradient-primary);
+    border-radius: 3px;
+    transition: width 0.8s ease-out;
+}
+
+.score-cat-pct {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 80px;
+    text-align: right;
+}
+
+.score-cat-arrow {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+    display: inline-block;
+}
+
+.score-cat-arrow.expanded {
+    transform: rotate(90deg);
+}
+
+/* Category Details */
+.score-cat-details {
+    padding: 0 0.85rem 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    animation: fadeIn 0.25s ease-out;
+}
+
+.score-detail-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    padding: 0.15rem 0;
+}
+
+.score-detail-dots {
+    display: flex;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.score-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(251, 191, 36, 0.15);
+    transition: background 0.3s;
+}
+
+.score-dot.filled {
+    background: var(--yellow-500);
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.3);
+}
+
+.score-detail-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 140px;
+    flex-shrink: 0;
+}
+
+.score-detail-reason {
+    color: var(--text-secondary);
+    flex: 1;
+    text-align: right;
+}
+
+/* AI Analysis */
+.score-ai-section {
+    background: white;
+    border: 1px solid rgba(251, 191, 36, 0.15);
+    border-radius: var(--radius-md);
+    padding: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+.score-ai-header {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: var(--yellow-700);
+    margin-bottom: 0.5rem;
+}
+
+.score-ai-text {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+/* ═══════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════ */
+
 @media (max-width: 768px) {
     .chat-container {
         height: calc(100vh - 90px);
@@ -257,7 +549,7 @@
     }
 
     .message-bubble {
-        max-width: 90%;
+        max-width: 92%;
     }
 
     .quick-actions {
@@ -268,5 +560,30 @@
 
     .quick-action-btn span {
         display: none;
+    }
+
+    .score-detail-name {
+        min-width: 100px;
+    }
+
+    .score-cat-bar-bg {
+        width: 40px;
+    }
+
+    .score-cat-pct {
+        min-width: 60px;
+        font-size: 0.65rem;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
     }
 }

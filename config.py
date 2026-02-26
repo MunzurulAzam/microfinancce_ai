@@ -31,6 +31,17 @@ class Config:
     MODEL_MAX_TOKENS = 500
     MODEL_TEMPERATURE = 0.7
     
+    # MSSQL Database (Credit Scoring)
+    MSSQL_SERVER = os.environ.get('MSSQL_SERVER', '192.129.248.10')
+    MSSQL_PORT = int(os.environ.get('MSSQL_PORT', 1543))
+    MSSQL_USER = os.environ.get('MSSQL_USER', 'umissa')
+    MSSQL_PASSWORD = os.environ.get('MSSQL_PASSWORD', 'm9X3f1S>C6@:E)BI')
+    MSSQL_DATABASE = os.environ.get('MSSQL_DATABASE', 'db_UMISv2_ug')
+    
+    # Ollama (Local LLM for Credit Scoring AI)
+    OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
+    OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen3-coder:480b-cloud')
+    
     @staticmethod
     def init_app(app):
         """Initialize app with config"""
