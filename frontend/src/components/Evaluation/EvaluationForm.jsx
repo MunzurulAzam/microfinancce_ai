@@ -47,7 +47,7 @@ const EvaluationForm = () => {
         data.append('bankStatement', file);
 
         try {
-            const response = await fetch('http://localhost:5001/api/evaluate', {
+            const response = await fetch('https://microfinancce-ai.onrender.com/api/evaluate', {
                 method: 'POST',
                 body: data,
             });
