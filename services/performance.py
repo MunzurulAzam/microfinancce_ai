@@ -1,7 +1,6 @@
-"""
-Performance calculation utilities
-Handles group performance, top performers, and risk analysis
-"""
+
+# Performance calculation start
+
 
 from services.data_processor import data_processor
 

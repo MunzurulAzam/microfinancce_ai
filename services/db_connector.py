@@ -82,7 +82,7 @@ def get_member_full_data(member_id):
     try:
         data = {}
 
-        # ── 1. Member basic info ──
+        # --------- Member basic info
         cursor.execute(
             "SELECT MemberId, FirstName, LastName, MemberCode, ContactNumber, "
             "MemberStatus, DateOfBirth, IdNumber, GroupId, Gender, Occupation, "
@@ -106,19 +106,19 @@ def get_member_full_data(member_id):
 
         group_id = member.get('GroupId')
 
-        # ── 2. Additional info (scoring fields) ──
+        # --------- Additional info (scoring fields)
         cursor.execute(
             "SELECT * FROM MfMemberAdditionalInfo WHERE MemberId = %s", (member_id,)
         )
         data['additional_info'] = cursor.fetchone() or {}
 
-        # ── 3. Business info ──
+        #--------- Business info
         cursor.execute(
             "SELECT * FROM MfMemberBusiness WHERE MemberId = %s", (member_id,)
         )
         data['business'] = cursor.fetchone() or {}
 
-        # ── 4. All loans (for cycle, overdue history) ──
+        # --------- All loans (for cycle, overdue history)
         cursor.execute(
             "SELECT LoanId, Cycle, PrincipalAmount, InstallmentAmount, LoanStatus, "
             "DisburseDate, GroupId, EmployeeId, BranchId, PrincipalOutstanding, "
@@ -130,7 +130,7 @@ def get_member_full_data(member_id):
         data['current_loan'] = loans[0] if loans else None
         data['loan_cycle'] = loans[0]['Cycle'] if loans else 0
 
-        # ── 5. Overdue count for previous loan cycle ──
+        # --------- Overdue count for previous loan cycle
         if len(loans) >= 2:
             prev_loan_id = loans[1]['LoanId']
             cursor.execute(
@@ -150,7 +150,7 @@ def get_member_full_data(member_id):
         else:
             data['prev_overdue_count'] = 0
 
-        # ── 6. Repayment history (current or most recent loan) ──
+        # --------- Repayment history (current or most recent loan)
         if loans:
             latest_loan_id = loans[0]['LoanId']
             cursor.execute(
@@ -165,7 +165,7 @@ def get_member_full_data(member_id):
             data['total_collections'] = 0
             data['overdue_collections'] = 0
 
-        # ── 7. Guarantor info (current + previous) ──
+        # --------- Guarantor info (current + previous)
         if loans:
             current_loan_id = loans[0]['LoanId']
             cursor.execute(
@@ -187,7 +187,7 @@ def get_member_full_data(member_id):
             data['current_guarantor'] = None
             data['prev_guarantor'] = None
 
-        # ── 8. Group info & member count ──
+        # --------- Group info & member count
         if group_id:
             cursor.execute(
                 "SELECT GroupId, GroupName, EmployeeId, BranchId FROM MfGroup "
@@ -205,14 +205,14 @@ def get_member_full_data(member_id):
             data['group'] = None
             data['group_member_count'] = 0
 
-        # ── 9. Mobile number change (compare across loan cycles) ──
+        # --------- Mobile number change (compare across loan cycles)
         data['mobile_changed'] = False
         if member.get('ContactNumber') and len(loans) >= 2:
             # We can't directly compare phone across cycles in MfMember (single row),
             # so we assume same if only 1 member record exists
             data['mobile_changed'] = False
 
-        # ── 10. Branch info ──
+        # --------- Branch info
         branch_id = loans[0]['BranchId'] if loans else (data['group'] or {}).get('BranchId')
         if branch_id:
             cursor.execute(
@@ -224,7 +224,7 @@ def get_member_full_data(member_id):
             data['branch'] = None
         data['branch_id'] = branch_id
 
-        # ── 11. Employee / Loan Officer info ──
+        # --------- Employee / Loan Officer info
         employee_id = loans[0]['EmployeeId'] if loans else (data['group'] or {}).get('EmployeeId')
         if employee_id:
             cursor.execute(
@@ -236,7 +236,7 @@ def get_member_full_data(member_id):
             data['employee'] = None
         data['employee_id'] = employee_id
 
-        # ── 12. Branch performance data ──
+        # --------- Branch performance data
         if branch_id:
             # Total borrowers in this branch
             cursor.execute(
@@ -280,7 +280,7 @@ def get_member_full_data(member_id):
             data['branch_par_loans'] = 0
             data['branch_performance'] = None
 
-        # ── 13. LO performance data ──
+        # --------- LO performance data
         if employee_id:
             # Groups per LO
             cursor.execute(

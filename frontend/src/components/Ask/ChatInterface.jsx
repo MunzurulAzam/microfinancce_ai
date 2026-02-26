@@ -152,7 +152,7 @@ const ChatInterface = () => {
                 {/* AI Analysis */}
                 {ai_analysis && (
                     <div className="score-ai-section">
-                        <div className="score-ai-header">🤖 AI Analysis</div>
+                        <div className="score-ai-header">AI Analysis</div>
                         <div className="score-ai-text">{ai_analysis}</div>
                     </div>
                 )}
