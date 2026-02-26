@@ -153,7 +153,7 @@ const EvaluationForm = () => {
                             ) : (
                                 <div className="upload-placeholder">
                                     <Upload size={32} />
-                                    <span>Upload Bank/Transaction PDF Statement</span>
+                                    <span>Upload Bank/Transaction PDF Statement<span style={{ color: '#dc2626', fontWeight: 700 }}>(More Than 4 Month)</span></span>
                                     <p>Only PDF files are supported</p>
                                 </div>
                             )}
