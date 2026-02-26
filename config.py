@@ -9,7 +9,8 @@ class Config:
     
     # CORS — read from env var on Render (comma-separated), fall back to localhost for local dev
     _cors_env = os.environ.get('CORS_ORIGINS', '')
-    CORS_ORIGINS = [o.strip() for o in _cors_env.split(',') if o.strip()] or \
+    # Strip spaces AND trailing slashes for exact origin matching
+    CORS_ORIGINS = [o.strip().rstrip('/') for o in _cors_env.split(',') if o.strip()] or \
                    ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:5001']
     
     # Data

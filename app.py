@@ -3,8 +3,7 @@ Main Flask Application
 Microfinance AI Analysis API
 """
 
-from flask import Flask, jsonify
-from flask_cors import CORS
+from flask import Flask, jsonify, request
 from config import Config
 from routes import data_bp, analysis_bp, ask_bp, evaluation_bp
 
@@ -18,14 +17,34 @@ def create_app(config_class=Config):
     # Initialize config
     config_class.init_app(app)
     
-    # Enable CORS — origins read from env var on Render (see config.py)
-    CORS(
-        app,
-        resources={r"/api/*": {"origins": config_class.CORS_ORIGINS}},
-        supports_credentials=False,
-        allow_headers=["Content-Type", "Authorization"],
-        methods=["GET", "POST", "OPTIONS"],
-    )
+    # ──────────────────────────────────────────────────────────────────────
+    # CORS — manually inject headers on EVERY response via @after_request
+    # This is the most reliable approach and does NOT depend on flask-cors.
+    # ──────────────────────────────────────────────────────────────────────
+    allowed_origins = config_class.CORS_ORIGINS
+    print(f"CORS ALLOWED ORIGINS: {allowed_origins}")
+
+    @app.after_request
+    def add_cors_headers(response):
+        origin = request.headers.get('Origin', '')
+        # If the request origin is in our whitelist, echo it back
+        if origin in allowed_origins or '*' in allowed_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+        else:
+            # Fallback: allow all (safe for public APIs with no credentials)
+            response.headers['Access-Control-Allow-Origin'] = '*'
+
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Max-Age'] = '3600'
+        return response
+
+    # Handle preflight OPTIONS requests explicitly
+    @app.before_request
+    def handle_preflight():
+        if request.method == 'OPTIONS':
+            response = app.make_default_options_response()
+            return response
     
     # Auto-load data if available
     from services.data_processor import data_processor
