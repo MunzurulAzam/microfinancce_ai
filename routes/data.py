@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
 from config import Config
-from services.data_processor import data_processor
+from services.mssql_data_service import get_basic_stats, get_all_clients, get_all_groups
 
 data_bp = Blueprint('data', __name__)
 
@@ -83,24 +83,22 @@ def upload_file():
 @data_bp.route('/stats', methods=['GET'])
 def get_stats():
     """
-    Get basic statistics about the dataset
-    
-    Response: Statistical summary
+    Get basic statistics from MSSQL database.
     """
     try:
-        stats = data_processor.get_basic_stats()
-        
+        stats = get_basic_stats()
+
         if stats is None:
             return jsonify({
                 'success': False,
-                'error': 'No data loaded. Please upload a CSV file first.'
-            }), 400
-        
+                'error': 'Could not connect to database or no data found.'
+            }), 500
+
         return jsonify({
             'success': True,
             'stats': stats
         }), 200
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -111,28 +109,21 @@ def get_stats():
 @data_bp.route('/clients', methods=['GET'])
 def get_clients():
     """
-    Get list of clients with pagination and search
-    
-    Query params:
-        - limit: Number of results (default: 100)
-        - offset: Starting position (default: 0)
-        - search: Search term for client name
-    
-    Response: List of clients
+    Get client list from MSSQL.
     """
     try:
         limit = int(request.args.get('limit', 100))
         offset = int(request.args.get('offset', 0))
         search = request.args.get('search', None)
-        
-        clients = data_processor.get_all_clients(limit=limit, offset=offset, search=search)
-        
+
+        clients = get_all_clients(limit=limit, offset=offset, search=search)
+
         return jsonify({
             'success': True,
             'clients': clients,
             'count': len(clients)
         }), 200
-        
+
     except Exception as e:
         return jsonify({
             'success': False,
@@ -143,28 +134,21 @@ def get_clients():
 @data_bp.route('/groups', methods=['GET'])
 def get_groups():
     """
-    Get list of groups with pagination and search
-    
-    Query params:
-        - limit: Number of results (default: 100)
-        - offset: Starting position (default: 0)
-        - search: Search term for group name
-    
-    Response: List of groups
+    Get group list from MSSQL.
     """
     try:
         limit = int(request.args.get('limit', 100))
         offset = int(request.args.get('offset', 0))
         search = request.args.get('search', None)
-        
-        groups = data_processor.get_all_groups(limit=limit, offset=offset, search=search)
-        
+
+        groups = get_all_groups(limit=limit, offset=offset, search=search)
+
         return jsonify({
             'success': True,
             'groups': groups,
             'count': len(groups)
         }), 200
-        
+
     except Exception as e:
         return jsonify({
             'success': False,

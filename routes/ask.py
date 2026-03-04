@@ -4,14 +4,16 @@ Intelligent question answering system
 """
 
 from flask import Blueprint, request, jsonify
-from services.data_processor import data_processor
-from services.analyzer import analyze_client, analyze_group
-from services.performance import (
+from services.mssql_data_service import (
+    get_basic_stats,
+    get_all_clients,
+    get_all_groups,
     get_top_performers,
     get_risk_analysis,
     get_quick_insights,
-    get_business_performance
 )
+from services.analyzer import analyze_client, analyze_group
+from services.performance import get_business_performance
 from services.db_connector import search_member, get_member_full_data
 from services.credit_scoring import calculate_credit_score
 from services.ollama_service import get_ai_analysis
@@ -116,12 +118,12 @@ def get_answer(intent, entity, question):
                 }
             
             result = analyze_client(entity)
-            
+
             if not result['success']:
-                # Suggest similar clients
-                clients = data_processor.get_all_clients(limit=5, search=entity[:3])
-                suggestions = [c['name'] for c in clients]
-                
+                # Suggest similar clients from MSSQL
+                suggestions_list = get_all_clients(limit=5, search=entity[:3])
+                suggestions = [c['name'] for c in suggestions_list]
+
                 return {
                     'success': False,
                     'answer': f'Client "{entity}" not found.',
@@ -158,12 +160,12 @@ def get_answer(intent, entity, question):
                 }
             
             result = analyze_group(entity)
-            
+
             if not result['success']:
-                # Suggest similar groups
-                groups = data_processor.get_all_groups(limit=5, search=entity[:3])
-                suggestions = [g['name'] for g in groups]
-                
+                # Suggest similar groups from MSSQL
+                suggestions_list = get_all_groups(limit=5, search=entity[:3])
+                suggestions = [g['name'] for g in suggestions_list]
+
                 return {
                     'success': False,
                     'answer': f'Group "{entity}" not found.',
@@ -198,27 +200,26 @@ def get_answer(intent, entity, question):
             }
         
         elif intent == 'stats':
-            stats = data_processor.get_basic_stats()
-            
+            stats = get_basic_stats()
+
             if not stats:
                 return {
                     'success': False,
-                    'answer': 'No data loaded. Please upload a CSV file first.'
+                    'answer': 'Could not connect to database. Please check the connection.'
                 }
-            
+
             answer = f"""
-📈 **Portfolio Statistics:**
+📈 **Portfolio Statistics (Live from Database):**
 
 **Total Clients:** {stats['total_clients']}
 **Total Groups:** {stats['total_groups']}
 **Total Loan Officers:** {stats['total_loan_officers']}
-**Total Loans:** {stats['total_loans']}
-**Total Portfolio:** {stats['total_loan_portfolio']:,.0f} UGX
-**Average Loan:** {stats['average_loan_amount']:,.0f} UGX
-**Average Client Score:** {stats['average_client_score']:.1f}/100
+**Total Active Loans:** {stats['total_loans']}
+**Total Portfolio:** {stats['total_loan_portfolio']:,.0f}
+**Average Loan:** {stats['average_loan_amount']:,.0f}
 **Clients with Overdue:** {stats['clients_with_overdue']}
 """
-            
+
             return {
                 'success': True,
                 'answer': answer.strip(),
@@ -227,33 +228,33 @@ def get_answer(intent, entity, question):
         
         elif intent == 'insights':
             insights = get_quick_insights()
-            
+
             if not insights:
                 return {
                     'success': False,
-                    'answer': 'No data loaded yet.'
+                    'answer': 'Could not connect to database.'
                 }
-            
-            top_clients = '\n'.join([f"  {i+1}. {c['name']}: {c['score']}/100" 
-                                    for i, c in enumerate(insights['top_clients'][:5])])
-            
-            risk = insights['risk_analysis']
-            
-            answer = f"""
-💡 **Quick Insights:**
 
-**🏆 Top 5 Clients:**
+            top_clients = '\n'.join([f"  {i+1}. {c['name']}: {c['score']:.1f}% ({c['classification']})" 
+                                    for i, c in enumerate(insights['top_clients'][:5])])
+
+            risk = insights['risk_analysis']
+
+            answer = f"""
+💡 **Quick Insights (Live from Database):**
+
+**🏆 Top 5 Clients by Credit Score:**
 {top_clients}
 
 **⚠️ Risk Status:**
-  - High Risk Clients: {risk['total_high_risk']}
-  - At Risk Amount: {risk['total_at_risk_amount']:,.0f} UGX
+  - High/Moderate Risk Clients: {risk['total_high_risk']}
+  - At Risk Amount: {risk['total_at_risk_amount']:,.0f}
 
-**📊 Portfolio Health:**
-  - Average Score: {insights['basic_stats']['average_client_score']:.1f}/100
-  - Total Portfolio: {insights['basic_stats']['total_loan_portfolio']:,.0f} UGX
+**📊 Portfolio:**
+  - Total Clients: {insights['basic_stats']['total_clients']}
+  - Total Portfolio: {insights['basic_stats']['total_loan_portfolio']:,.0f}
 """
-            
+
             return {
                 'success': True,
                 'answer': answer.strip(),
@@ -262,16 +263,16 @@ def get_answer(intent, entity, question):
         
         elif intent == 'top_clients':
             top_clients = get_top_performers(limit=10, performance_type='clients')
-            
-            clients_list = '\n'.join([f"  {i+1}. {c['name']}: {c['score']}/100 (Loan: {c['loan_amount']:,.0f} UGX)" 
+
+            clients_list = '\n'.join([f"  {i+1}. {c['name']}: {c['score']:.1f}% — {c['classification']} (Loan: {c['loan_amount']:,.0f})" 
                                      for i, c in enumerate(top_clients)])
-            
+
             answer = f"""
-🏆 **Top 10 Performing Clients:**
+🏆 **Top 10 Clients by Credit Score (from DB):**
 
 {clients_list}
 """
-            
+
             return {
                 'success': True,
                 'answer': answer.strip(),
@@ -298,23 +299,23 @@ def get_answer(intent, entity, question):
         
         elif intent == 'risk_analysis':
             risk = get_risk_analysis(overdue_threshold=3)
-            
+
             if risk['total_high_risk'] == 0:
-                answer = "✅ No high-risk clients detected!"
+                answer = "✅ No high-risk clients detected! All scored above 70%."
             else:
-                risk_list = '\n'.join([f"  - {c['name']}: {c['overdue_count']} overdue (Amount: {c['loan_amount']:,.0f} UGX)" 
+                risk_list = '\n'.join([f"  - {c['name']} ({c['code']}): {c['score']:.1f}% — {c['classification']} (Loan: {c['loan_amount']:,.0f})" 
                                       for c in risk['high_risk_clients'][:10]])
-                
+
                 answer = f"""
-⚠️ **Risk Analysis:**
+⚠️ **Risk Analysis (Credit Score Based):**
 
-**Total High-Risk Clients:** {risk['total_high_risk']}
-**Total At-Risk Amount:** {risk['total_at_risk_amount']:,.0f} UGX
+**Total High/Moderate Risk Clients:** {risk['total_high_risk']}
+**Total At-Risk Amount:** {risk['total_at_risk_amount']:,.0f}
 
-**High-Risk Clients (Top 10):**
+**Clients Scoring Below 70% (Top 10):**
 {risk_list}
 """
-            
+
             return {
                 'success': True,
                 'answer': answer.strip(),

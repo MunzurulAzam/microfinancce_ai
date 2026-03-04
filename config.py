@@ -36,7 +36,7 @@ class Config:
     MSSQL_PORT = int(os.environ.get('MSSQL_PORT', 1543))
     MSSQL_USER = os.environ.get('MSSQL_USER', 'umissa')
     MSSQL_PASSWORD = os.environ.get('MSSQL_PASSWORD', 'm9X3f1S>C6@:E)BI')
-    MSSQL_DATABASE = os.environ.get('MSSQL_DATABASE', 'db_UMISv2_ug')
+    MSSQL_DATABASE = os.environ.get('MSSQL_DATABASE', 'db_UMISv2_TZ')
     
     # Ollama (Local LLM for Credit Scoring AI)
     OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')

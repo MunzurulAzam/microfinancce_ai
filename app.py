@@ -3,6 +3,10 @@ Main Flask Application
 Microfinance AI Analysis API
 """
 
+# Load .env for local development (no-op on Render where env vars are set natively)
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask, jsonify, request
 from config import Config
 from routes import data_bp, analysis_bp, ask_bp, evaluation_bp

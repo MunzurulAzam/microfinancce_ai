@@ -25,3 +25,4 @@ models/*.gguf
 .idea/
 *.log
 frontend/.env.local
+.env
