@@ -252,160 +252,167 @@ def _score_social_media(data):
 
 
 
+# =============================================================================
 # BRANCH / BRANCH MANAGER PERFORMANCE
+# NOTE: Commented out for now. Only Client Scoring is active.
+#       Uncomment this entire section to re-enable branch performance scoring.
+# =============================================================================
 
-def _score_branch_borrower_growth(data):
-    """Borrower Growth Per Month"""
-    perf = data.get('branch_performance')
-    if not perf:
-        return 3, "No performance data"
-    new_admissions = perf.get('NoOfNewAdmission', 0) or 0
-    if new_admissions >= 20:
-        return 5, f"{new_admissions} new admissions"
-    elif new_admissions >= 15:
-        return 4, f"{new_admissions} new admissions"
-    elif new_admissions >= 10:
-        return 3, f"{new_admissions} new admissions"
-    elif new_admissions >= 5:
-        return 2, f"{new_admissions} new admissions"
-    else:
-        return 0, f"{new_admissions} new admissions (reduced)"
-
-
-def _score_branch_target(data):
-    """Borrower Target vs Achievement"""
-    perf = data.get('branch_performance')
-    if not perf:
-        return 3, "No target data"
-    disbursed = perf.get('NoOfTotalDisburse', 0) or 0
-    if disbursed >= 50:
-        return 5, f"{disbursed} disbursements"
-    elif disbursed >= 40:
-        return 4, f"{disbursed} disbursements"
-    elif disbursed >= 30:
-        return 3, f"{disbursed} disbursements"
-    elif disbursed >= 20:
-        return 2, f"{disbursed} disbursements"
-    else:
-        return 1, f"{disbursed} disbursements"
+# def _score_branch_borrower_growth(data):
+#     """Borrower Growth Per Month"""
+#     perf = data.get('branch_performance')
+#     if not perf:
+#         return 3, "No performance data"
+#     new_admissions = perf.get('NoOfNewAdmission', 0) or 0
+#     if new_admissions >= 20:
+#         return 5, f"{new_admissions} new admissions"
+#     elif new_admissions >= 15:
+#         return 4, f"{new_admissions} new admissions"
+#     elif new_admissions >= 10:
+#         return 3, f"{new_admissions} new admissions"
+#     elif new_admissions >= 5:
+#         return 2, f"{new_admissions} new admissions"
+#     else:
+#         return 0, f"{new_admissions} new admissions (reduced)"
 
 
-def _score_branch_par(data):
-    """PAR > 30 Days"""
-    total = data.get('branch_total_active_loans', 0)
-    par = data.get('branch_par_loans', 0)
-    if total == 0:
-        return 3, "No active loans"
-    par_rate = (par / total) * 100
-    if par_rate == 0:
-        return 5, "0% PAR"
-    elif par_rate < 1:
-        return 4, f"{par_rate:.2f}% PAR"
-    elif par_rate < 2:
-        return 3, f"{par_rate:.2f}% PAR"
-    elif par_rate < 3:
-        return 2, f"{par_rate:.2f}% PAR"
-    else:
-        return 1, f"{par_rate:.2f}% PAR"
+# def _score_branch_target(data):
+#     """Borrower Target vs Achievement"""
+#     perf = data.get('branch_performance')
+#     if not perf:
+#         return 3, "No target data"
+#     disbursed = perf.get('NoOfTotalDisburse', 0) or 0
+#     if disbursed >= 50:
+#         return 5, f"{disbursed} disbursements"
+#     elif disbursed >= 40:
+#         return 4, f"{disbursed} disbursements"
+#     elif disbursed >= 30:
+#         return 3, f"{disbursed} disbursements"
+#     elif disbursed >= 20:
+#         return 2, f"{disbursed} disbursements"
+#     else:
+#         return 1, f"{disbursed} disbursements"
 
 
-def _score_branch_staff_dropout(data):
-    """Staff Dropout (Yearly) — estimated"""
-    # Without direct staff dropout data, use a neutral score
-    return 4, "Staff dropout data not tracked"
+# def _score_branch_par(data):
+#     """PAR > 30 Days"""
+#     total = data.get('branch_total_active_loans', 0)
+#     par = data.get('branch_par_loans', 0)
+#     if total == 0:
+#         return 3, "No active loans"
+#     par_rate = (par / total) * 100
+#     if par_rate == 0:
+#         return 5, "0% PAR"
+#     elif par_rate < 1:
+#         return 4, f"{par_rate:.2f}% PAR"
+#     elif par_rate < 2:
+#         return 3, f"{par_rate:.2f}% PAR"
+#     elif par_rate < 3:
+#         return 2, f"{par_rate:.2f}% PAR"
+#     else:
+#         return 1, f"{par_rate:.2f}% PAR"
 
 
-def _score_branch_client_dropout(data):
-    """Client Dropout (Yearly) — estimated"""
-    return 4, "Client dropout data not tracked"
+# def _score_branch_staff_dropout(data):
+#     """Staff Dropout (Yearly) — estimated"""
+#     return 4, "Staff dropout data not tracked"
 
 
+# def _score_branch_client_dropout(data):
+#     """Client Dropout (Yearly) — estimated"""
+#     return 4, "Client dropout data not tracked"
 
+
+# =============================================================================
 # LOAN OFFICER PERFORMANCE  (6 parameters, max 30)
-def _score_lo_borrower_growth(data):
-    """LO Borrower Growth"""
-    perf = data.get('lo_performance')
-    if not perf:
-        return 3, "No LO performance data"
-    new_borrowers = perf.get('NoOfNewBorrower_Cycle_1', 0) or 0
-    if new_borrowers >= 10:
-        return 5, f"{new_borrowers} new cycle-1 borrowers"
-    elif new_borrowers >= 7:
-        return 4, f"{new_borrowers} new cycle-1 borrowers"
-    elif new_borrowers >= 5:
-        return 3, f"{new_borrowers} new cycle-1 borrowers"
-    elif new_borrowers >= 3:
-        return 2, f"{new_borrowers} new cycle-1 borrowers"
-    else:
-        return 0, f"{new_borrowers} new cycle-1 borrowers"
+# NOTE: Commented out for now. Only Client Scoring is active.
+#       Uncomment this entire section to re-enable LO performance scoring.
+# =============================================================================
+
+# def _score_lo_borrower_growth(data):
+#     """LO Borrower Growth"""
+#     perf = data.get('lo_performance')
+#     if not perf:
+#         return 3, "No LO performance data"
+#     new_borrowers = perf.get('NoOfNewBorrower_Cycle_1', 0) or 0
+#     if new_borrowers >= 10:
+#         return 5, f"{new_borrowers} new cycle-1 borrowers"
+#     elif new_borrowers >= 7:
+#         return 4, f"{new_borrowers} new cycle-1 borrowers"
+#     elif new_borrowers >= 5:
+#         return 3, f"{new_borrowers} new cycle-1 borrowers"
+#     elif new_borrowers >= 3:
+#         return 2, f"{new_borrowers} new cycle-1 borrowers"
+#     else:
+#         return 0, f"{new_borrowers} new cycle-1 borrowers"
 
 
-def _score_lo_target(data):
-    """LO Target vs Achievement"""
-    perf = data.get('lo_performance')
-    if not perf:
-        return 3, "No LO target data"
-    disbursed = perf.get('NoOfTotalDisburse', 0) or 0
-    if disbursed >= 25:
-        return 5, f"{disbursed} disbursements"
-    elif disbursed >= 20:
-        return 4, f"{disbursed} disbursements"
-    elif disbursed >= 15:
-        return 3, f"{disbursed} disbursements"
-    elif disbursed >= 10:
-        return 2, f"{disbursed} disbursements"
-    else:
-        return 1, f"{disbursed} disbursements"
+# def _score_lo_target(data):
+#     """LO Target vs Achievement"""
+#     perf = data.get('lo_performance')
+#     if not perf:
+#         return 3, "No LO target data"
+#     disbursed = perf.get('NoOfTotalDisburse', 0) or 0
+#     if disbursed >= 25:
+#         return 5, f"{disbursed} disbursements"
+#     elif disbursed >= 20:
+#         return 4, f"{disbursed} disbursements"
+#     elif disbursed >= 15:
+#         return 3, f"{disbursed} disbursements"
+#     elif disbursed >= 10:
+#         return 2, f"{disbursed} disbursements"
+#     else:
+#         return 1, f"{disbursed} disbursements"
 
 
-def _score_lo_par(data):
-    """LO PAR > 30 Days — Special: if PAR increases → 0"""
-    total = data.get('lo_total_active_loans', 0)
-    par = data.get('lo_par_loans', 0)
-    if total == 0:
-        return 3, "No active loans"
-    par_rate = (par / total) * 100
-    if par_rate == 0:
-        return 5, "0% PAR"
-    elif par_rate < 1:
-        return 4, f"{par_rate:.2f}% PAR"
-    elif par_rate < 2:
-        return 3, f"{par_rate:.2f}% PAR"
-    elif par_rate < 3:
-        return 2, f"{par_rate:.2f}% PAR"
-    else:
-        return 1, f"{par_rate:.2f}% PAR"
+# def _score_lo_par(data):
+#     """LO PAR > 30 Days — Special: if PAR increases → 0"""
+#     total = data.get('lo_total_active_loans', 0)
+#     par = data.get('lo_par_loans', 0)
+#     if total == 0:
+#         return 3, "No active loans"
+#     par_rate = (par / total) * 100
+#     if par_rate == 0:
+#         return 5, "0% PAR"
+#     elif par_rate < 1:
+#         return 4, f"{par_rate:.2f}% PAR"
+#     elif par_rate < 2:
+#         return 3, f"{par_rate:.2f}% PAR"
+#     elif par_rate < 3:
+#         return 2, f"{par_rate:.2f}% PAR"
+#     else:
+#         return 1, f"{par_rate:.2f}% PAR"
 
 
-def _score_lo_staff_dropout(data):
-    """LO area staff dropout"""
-    return 4, "Staff dropout data not tracked"
+# def _score_lo_staff_dropout(data):
+#     """LO area staff dropout"""
+#     return 4, "Staff dropout data not tracked"
 
 
-def _score_lo_client_dropout(data):
-    """LO area client dropout"""
-    return 4, "Client dropout data not tracked"
+# def _score_lo_client_dropout(data):
+#     """LO area client dropout"""
+#     return 4, "Client dropout data not tracked"
 
 
-def _score_lo_group_size(data):
-    """Group Size per LO"""
-    lo_members = data.get('lo_total_members', 0)
-    lo_groups = data.get('lo_group_count', 1)
-    if lo_groups == 0:
-        lo_groups = 1
-    avg = lo_members / lo_groups
-    if 21 <= avg <= 25:
-        return 5, f"Avg {avg:.0f} members/group"
-    elif 16 <= avg <= 20:
-        return 4, f"Avg {avg:.0f} members/group"
-    elif 11 <= avg <= 15:
-        return 3, f"Avg {avg:.0f} members/group"
-    elif avg == 10:
-        return 2, f"Avg {avg:.0f} members/group"
-    elif avg > 25:
-        return 5, f"Avg {avg:.0f} members/group (large)"
-    else:
-        return 1, f"Avg {avg:.0f} members/group"
+# def _score_lo_group_size(data):
+#     """Group Size per LO"""
+#     lo_members = data.get('lo_total_members', 0)
+#     lo_groups = data.get('lo_group_count', 1)
+#     if lo_groups == 0:
+#         lo_groups = 1
+#     avg = lo_members / lo_groups
+#     if 21 <= avg <= 25:
+#         return 5, f"Avg {avg:.0f} members/group"
+#     elif 16 <= avg <= 20:
+#         return 4, f"Avg {avg:.0f} members/group"
+#     elif 11 <= avg <= 15:
+#         return 3, f"Avg {avg:.0f} members/group"
+#     elif avg == 10:
+#         return 2, f"Avg {avg:.0f} members/group"
+#     elif avg > 25:
+#         return 5, f"Avg {avg:.0f} members/group (large)"
+#     else:
+#         return 1, f"Avg {avg:.0f} members/group"
 
 
 # MAIN SCORING FUNCTION
@@ -434,29 +441,35 @@ CLIENT_SCORING_FUNCS = [
     ("Social Media Account", _score_social_media),
 ]
 
-BRANCH_SCORING_FUNCS = [
-    ("Borrower Growth/Month", _score_branch_borrower_growth),
-    ("Target vs Achievement", _score_branch_target),
-    ("PAR > 30 Days", _score_branch_par),
-    ("Staff Dropout", _score_branch_staff_dropout),
-    ("Client Dropout", _score_branch_client_dropout),
-]
+# BRANCH_SCORING_FUNCS = [
+#     ("Borrower Growth/Month", _score_branch_borrower_growth),
+#     ("Target vs Achievement", _score_branch_target),
+#     ("PAR > 30 Days", _score_branch_par),
+#     ("Staff Dropout", _score_branch_staff_dropout),
+#     ("Client Dropout", _score_branch_client_dropout),
+# ]
 
-LO_SCORING_FUNCS = [
-    ("LO Borrower Growth", _score_lo_borrower_growth),
-    ("LO Target Achievement", _score_lo_target),
-    ("LO PAR > 30 Days", _score_lo_par),
-    ("LO Staff Dropout", _score_lo_staff_dropout),
-    ("LO Client Dropout", _score_lo_client_dropout),
-    ("Group Size per LO", _score_lo_group_size),
-]
+# LO_SCORING_FUNCS = [
+#     ("LO Borrower Growth", _score_lo_borrower_growth),
+#     ("LO Target Achievement", _score_lo_target),
+#     ("LO PAR > 30 Days", _score_lo_par),
+#     ("LO Staff Dropout", _score_lo_staff_dropout),
+#     ("LO Client Dropout", _score_lo_client_dropout),
+#     ("Group Size per LO", _score_lo_group_size),
+# ]
 
 
 def calculate_credit_score(data):
     """
-    Calculate the full credit score for a member.
-    Returns a structured result with breakdown.
+    Calculate the credit score for a member — CLIENT SCORING ONLY.
+
+    Currently active: Client Scoring (21 parameters, max 105 points)
+
+    Future use (commented out below):
+      - Branch Performance Scoring (5 parameters, max 25 points)
+      - Loan Officer Performance Scoring (6 parameters, max 30 points)
     """
+    # ── Client Scoring ─────────────────────────────────────────────────────
     client_details = []
     client_total = 0
     client_max = len(CLIENT_SCORING_FUNCS) * 5
@@ -471,37 +484,27 @@ def calculate_credit_score(data):
         })
         client_total += score
 
-    branch_details = []
-    branch_total = 0
-    branch_max = len(BRANCH_SCORING_FUNCS) * 5
+    # ── Branch Scoring (disabled — uncomment BRANCH_SCORING_FUNCS block to enable) ──
+    # branch_details = []
+    # branch_total = 0
+    # branch_max = len(BRANCH_SCORING_FUNCS) * 5
+    # for name, func in BRANCH_SCORING_FUNCS:
+    #     score, reason = func(data)
+    #     branch_details.append({'parameter': name, 'score': score, 'max': 5, 'reason': reason})
+    #     branch_total += score
 
-    for name, func in BRANCH_SCORING_FUNCS:
-        score, reason = func(data)
-        branch_details.append({
-            'parameter': name,
-            'score': score,
-            'max': 5,
-            'reason': reason
-        })
-        branch_total += score
+    # ── LO Scoring (disabled — uncomment LO_SCORING_FUNCS block to enable) ────────
+    # lo_details = []
+    # lo_total = 0
+    # lo_max = len(LO_SCORING_FUNCS) * 5
+    # for name, func in LO_SCORING_FUNCS:
+    #     score, reason = func(data)
+    #     lo_details.append({'parameter': name, 'score': score, 'max': 5, 'reason': reason})
+    #     lo_total += score
 
-    lo_details = []
-    lo_total = 0
-    lo_max = len(LO_SCORING_FUNCS) * 5
-
-    for name, func in LO_SCORING_FUNCS:
-        score, reason = func(data)
-        lo_details.append({
-            'parameter': name,
-            'score': score,
-            'max': 5,
-            'reason': reason
-        })
-        lo_total += score
-
-    # Overall
-    total_score = client_total + branch_total + lo_total
-    max_score = client_max + branch_max + lo_max
+    # ── Overall (client-only) ──────────────────────────────────────────────
+    total_score = client_total
+    max_score = client_max
     percentage = (total_score / max_score) * 100 if max_score > 0 else 0
 
     # Classification
@@ -537,18 +540,21 @@ def calculate_credit_score(data):
             'percentage': round((client_total / client_max) * 100, 1) if client_max > 0 else 0,
             'details': client_details
         },
-        'branch_scoring': {
-            'score': branch_total,
-            'max': branch_max,
-            'percentage': round((branch_total / branch_max) * 100, 1) if branch_max > 0 else 0,
-            'details': branch_details,
-            'branch_name': (data.get('branch') or {}).get('BranchName', 'N/A')
-        },
-        'lo_scoring': {
-            'score': lo_total,
-            'max': lo_max,
-            'percentage': round((lo_total / lo_max) * 100, 1) if lo_max > 0 else 0,
-            'details': lo_details,
-            'lo_name': (data.get('employee') or {}).get('EmployeeName', 'N/A')
-        }
+
+        # ── Branch & LO scoring disabled (client-only mode) ───────────────
+        # Uncomment below + BRANCH_SCORING_FUNCS/LO_SCORING_FUNCS to re-enable.
+        # 'branch_scoring': {
+        #     'score': branch_total,
+        #     'max': branch_max,
+        #     'percentage': round((branch_total / branch_max) * 100, 1) if branch_max > 0 else 0,
+        #     'details': branch_details,
+        #     'branch_name': (data.get('branch') or {}).get('BranchName', 'N/A')
+        # },
+        # 'lo_scoring': {
+        #     'score': lo_total,
+        #     'max': lo_max,
+        #     'percentage': round((lo_total / lo_max) * 100, 1) if lo_max > 0 else 0,
+        #     'details': lo_details,
+        #     'lo_name': (data.get('employee') or {}).get('EmployeeName', 'N/A')
+        # }
     }

@@ -236,101 +236,107 @@ def get_member_full_data(member_id):
             data['employee'] = None
         data['employee_id'] = employee_id
 
-        # --------- Branch performance data
-        if branch_id:
-            # Total borrowers in this branch
-            cursor.execute(
-                "SELECT COUNT(DISTINCT m.MemberId) as total_borrowers "
-                "FROM MfLoan l JOIN MfMember m ON l.MemberId = m.MemberId "
-                "WHERE l.BranchId = %s AND l.LoanStatus = 1", (branch_id,)
-            )
-            row = cursor.fetchone()
-            data['branch_total_borrowers'] = row['total_borrowers'] if row else 0
+        # =========================================================
+        # BRANCH PERFORMANCE DATA — Disabled (Client-Only Mode)
+        # Uncomment this entire block to re-enable branch performance scoring.
+        # =========================================================
+        # if branch_id:
+        #     # Total borrowers in this branch
+        #     cursor.execute(
+        #         "SELECT COUNT(DISTINCT m.MemberId) as total_borrowers "
+        #         "FROM MfLoan l JOIN MfMember m ON l.MemberId = m.MemberId "
+        #         "WHERE l.BranchId = %s AND l.LoanStatus = 1", (branch_id,)
+        #     )
+        #     row = cursor.fetchone()
+        #     data['branch_total_borrowers'] = row['total_borrowers'] if row else 0
+        #
+        #     # PAR > 30 days for this branch
+        #     cursor.execute(
+        #         "SELECT COUNT(*) as overdue_loans FROM MfLoan "
+        #         "WHERE BranchId = %s AND LoanStatus = 1 AND PrincipalOutstanding > 0",
+        #         (branch_id,)
+        #     )
+        #     row = cursor.fetchone()
+        #     data['branch_total_active_loans'] = row['overdue_loans'] if row else 0
+        #
+        #     # Overdue loans in branch (PAR proxy)
+        #     cursor.execute(
+        #         "SELECT COUNT(DISTINCT l.LoanId) as par_loans "
+        #         "FROM MfLoan l "
+        #         "JOIN MfLoanCollection lc ON l.LoanId = lc.LoanId "
+        #         "WHERE l.BranchId = %s AND l.LoanStatus = 1 "
+        #         "AND lc.OverdueAmount > 0 AND lc.IsNewOverdue = 1",
+        #         (branch_id,)
+        #     )
+        #     row = cursor.fetchone()
+        #     data['branch_par_loans'] = row['par_loans'] if row else 0
+        #
+        #     # Branch performance tracker (latest)
+        #     cursor.execute(
+        #         "SELECT TOP 1 * FROM MfPerformanceTrackerData "
+        #         "WHERE BranchId = %s ORDER BY BusinessDate DESC", (branch_id,)
+        #     )
+        #     data['branch_performance'] = cursor.fetchone()
+        # else:
+        #     data['branch_total_borrowers'] = 0
+        #     data['branch_total_active_loans'] = 0
+        #     data['branch_par_loans'] = 0
+        #     data['branch_performance'] = None
 
-            # PAR > 30 days for this branch
-            cursor.execute(
-                "SELECT COUNT(*) as overdue_loans FROM MfLoan "
-                "WHERE BranchId = %s AND LoanStatus = 1 AND PrincipalOutstanding > 0",
-                (branch_id,)
-            )
-            row = cursor.fetchone()
-            data['branch_total_active_loans'] = row['overdue_loans'] if row else 0
-
-            # Overdue loans in branch (PAR proxy)
-            cursor.execute(
-                "SELECT COUNT(DISTINCT l.LoanId) as par_loans "
-                "FROM MfLoan l "
-                "JOIN MfLoanCollection lc ON l.LoanId = lc.LoanId "
-                "WHERE l.BranchId = %s AND l.LoanStatus = 1 "
-                "AND lc.OverdueAmount > 0 AND lc.IsNewOverdue = 1",
-                (branch_id,)
-            )
-            row = cursor.fetchone()
-            data['branch_par_loans'] = row['par_loans'] if row else 0
-
-            # Branch performance tracker (latest)
-            cursor.execute(
-                "SELECT TOP 1 * FROM MfPerformanceTrackerData "
-                "WHERE BranchId = %s ORDER BY BusinessDate DESC", (branch_id,)
-            )
-            data['branch_performance'] = cursor.fetchone()
-        else:
-            data['branch_total_borrowers'] = 0
-            data['branch_total_active_loans'] = 0
-            data['branch_par_loans'] = 0
-            data['branch_performance'] = None
-
-        # --------- LO performance data
-        if employee_id:
-            # Groups per LO
-            cursor.execute(
-                "SELECT COUNT(*) as group_count FROM MfGroup "
-                "WHERE EmployeeId = %s AND GroupStatus = 'Active'", (employee_id,)
-            )
-            row = cursor.fetchone()
-            data['lo_group_count'] = row['group_count'] if row else 0
-
-            # Total members per LO
-            cursor.execute(
-                "SELECT COUNT(DISTINCT m.MemberId) as member_count "
-                "FROM MfGroup g JOIN MfMember m ON g.GroupId = m.GroupId "
-                "WHERE g.EmployeeId = %s AND g.GroupStatus = 'Active' AND m.MemberStatus = 'Active'",
-                (employee_id,)
-            )
-            row = cursor.fetchone()
-            data['lo_total_members'] = row['member_count'] if row else 0
-
-            # LO PAR
-            cursor.execute(
-                "SELECT COUNT(DISTINCT l.LoanId) as par_loans "
-                "FROM MfLoan l "
-                "JOIN MfLoanCollection lc ON l.LoanId = lc.LoanId "
-                "WHERE l.EmployeeId = %s AND l.LoanStatus = 1 "
-                "AND lc.OverdueAmount > 0 AND lc.IsNewOverdue = 1",
-                (employee_id,)
-            )
-            row = cursor.fetchone()
-            data['lo_par_loans'] = row['par_loans'] if row else 0
-
-            cursor.execute(
-                "SELECT COUNT(*) as total_active FROM MfLoan "
-                "WHERE EmployeeId = %s AND LoanStatus = 1", (employee_id,)
-            )
-            row = cursor.fetchone()
-            data['lo_total_active_loans'] = row['total_active'] if row else 0
-
-            # LO performance tracker
-            cursor.execute(
-                "SELECT TOP 1 * FROM MfPerformanceTrackerData "
-                "WHERE Loid = %s ORDER BY BusinessDate DESC", (employee_id,)
-            )
-            data['lo_performance'] = cursor.fetchone()
-        else:
-            data['lo_group_count'] = 0
-            data['lo_total_members'] = 0
-            data['lo_par_loans'] = 0
-            data['lo_total_active_loans'] = 0
-            data['lo_performance'] = None
+        # =========================================================
+        # LOAN OFFICER PERFORMANCE DATA — Disabled (Client-Only Mode)
+        # Uncomment this entire block to re-enable LO performance scoring.
+        # =========================================================
+        # if employee_id:
+        #     # Groups per LO
+        #     cursor.execute(
+        #         "SELECT COUNT(*) as group_count FROM MfGroup "
+        #         "WHERE EmployeeId = %s AND GroupStatus = 'Active'", (employee_id,)
+        #     )
+        #     row = cursor.fetchone()
+        #     data['lo_group_count'] = row['group_count'] if row else 0
+        #
+        #     # Total members per LO
+        #     cursor.execute(
+        #         "SELECT COUNT(DISTINCT m.MemberId) as member_count "
+        #         "FROM MfGroup g JOIN MfMember m ON g.GroupId = m.GroupId "
+        #         "WHERE g.EmployeeId = %s AND g.GroupStatus = 'Active' AND m.MemberStatus = 'Active'",
+        #         (employee_id,)
+        #     )
+        #     row = cursor.fetchone()
+        #     data['lo_total_members'] = row['member_count'] if row else 0
+        #
+        #     # LO PAR
+        #     cursor.execute(
+        #         "SELECT COUNT(DISTINCT l.LoanId) as par_loans "
+        #         "FROM MfLoan l "
+        #         "JOIN MfLoanCollection lc ON l.LoanId = lc.LoanId "
+        #         "WHERE l.EmployeeId = %s AND l.LoanStatus = 1 "
+        #         "AND lc.OverdueAmount > 0 AND lc.IsNewOverdue = 1",
+        #         (employee_id,)
+        #     )
+        #     row = cursor.fetchone()
+        #     data['lo_par_loans'] = row['par_loans'] if row else 0
+        #
+        #     cursor.execute(
+        #         "SELECT COUNT(*) as total_active FROM MfLoan "
+        #         "WHERE EmployeeId = %s AND LoanStatus = 1", (employee_id,)
+        #     )
+        #     row = cursor.fetchone()
+        #     data['lo_total_active_loans'] = row['total_active'] if row else 0
+        #
+        #     # LO performance tracker
+        #     cursor.execute(
+        #         "SELECT TOP 1 * FROM MfPerformanceTrackerData "
+        #         "WHERE Loid = %s ORDER BY BusinessDate DESC", (employee_id,)
+        #     )
+        #     data['lo_performance'] = cursor.fetchone()
+        # else:
+        #     data['lo_group_count'] = 0
+        #     data['lo_total_members'] = 0
+        #     data['lo_par_loans'] = 0
+        #     data['lo_total_active_loans'] = 0
+        #     data['lo_performance'] = None
 
         return data
 

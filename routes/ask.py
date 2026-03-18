@@ -432,7 +432,10 @@ def _handle_credit_score(entity):
 
 
 def _format_credit_score_text(sr):
-    """Format credit score result as readable text for the chat."""
+    """Format credit score result as readable text for the chat.
+    Currently shows Client Scoring only.
+    Branch and LO sections are commented out below for future use.
+    """
     # Classification emoji
     cls_emoji = {
         'Excellent': '🟢',
@@ -447,28 +450,32 @@ def _format_credit_score_text(sr):
         f"",
         f"{'═' * 40}",
         f"{emoji} **Overall: {sr['percentage']}% — {sr['classification']}**",
-        f"Total Score: {sr['total_score']} / {sr['max_score']}",
+        f"Total Score: {sr['total_score']} / {sr['max_score']} (Client Scoring — 21 parameters)",
         f"{'═' * 40}",
         f"",
-        f"📋 **1. Client Scoring:** {sr['client_scoring']['score']}/{sr['client_scoring']['max']} ({sr['client_scoring']['percentage']}%)",
+        f"📋 **Client Scoring:** {sr['client_scoring']['score']}/{sr['client_scoring']['max']} ({sr['client_scoring']['percentage']}%)",
     ]
 
-    # Show client details
+    # Show client parameter details
     for d in sr['client_scoring']['details']:
         bar = '█' * d['score'] + '░' * (5 - d['score'])
         lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
 
-    lines.append(f"")
-    lines.append(f"🏢 **2. Branch Performance:** {sr['branch_scoring']['score']}/{sr['branch_scoring']['max']} ({sr['branch_scoring']['percentage']}%) — {sr['branch_scoring']['branch_name']}")
-    for d in sr['branch_scoring']['details']:
-        bar = '█' * d['score'] + '░' * (5 - d['score'])
-        lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
+    # ── Branch Performance section (disabled — Client-Only Mode) ──────────────
+    # Uncomment below when branch scoring is re-enabled in credit_scoring.py
+    # lines.append(f"")
+    # lines.append(f"🏢 **Branch Performance:** {sr['branch_scoring']['score']}/{sr['branch_scoring']['max']} ({sr['branch_scoring']['percentage']}%) — {sr['branch_scoring']['branch_name']}")
+    # for d in sr['branch_scoring']['details']:
+    #     bar = '█' * d['score'] + '░' * (5 - d['score'])
+    #     lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
 
-    lines.append(f"")
-    lines.append(f"👤 **3. Loan Officer:** {sr['lo_scoring']['score']}/{sr['lo_scoring']['max']} ({sr['lo_scoring']['percentage']}%) — {sr['lo_scoring']['lo_name']}")
-    for d in sr['lo_scoring']['details']:
-        bar = '█' * d['score'] + '░' * (5 - d['score'])
-        lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
+    # ── Loan Officer section (disabled — Client-Only Mode) ────────────────────
+    # Uncomment below when LO scoring is re-enabled in credit_scoring.py
+    # lines.append(f"")
+    # lines.append(f"👤 **Loan Officer:** {sr['lo_scoring']['score']}/{sr['lo_scoring']['max']} ({sr['lo_scoring']['percentage']}%) — {sr['lo_scoring']['lo_name']}")
+    # for d in sr['lo_scoring']['details']:
+    #     bar = '█' * d['score'] + '░' * (5 - d['score'])
+    #     lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
 
     lines.append(f"")
     lines.append(f"{'─' * 40}")
