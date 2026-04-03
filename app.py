@@ -20,11 +20,8 @@ def create_app(config_class=Config):
     
     # Initialize config
     config_class.init_app(app)
-    
-    # ──────────────────────────────────────────────────────────────────────
-    # CORS — manually inject headers on EVERY response via @after_request
-    # This is the most reliable approach and does NOT depend on flask-cors.
-    # ──────────────────────────────────────────────────────────────────────
+
+    # CORS
     allowed_origins = config_class.CORS_ORIGINS
     print(f"CORS ALLOWED ORIGINS: {allowed_origins}")
 
