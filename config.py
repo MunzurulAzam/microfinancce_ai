@@ -40,7 +40,7 @@ class Config:
     
     # Ollama (Local LLM for Credit Scoring AI)
     OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
-    OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'qwen3-coder:480b-cloud')
+    OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'deepseek-coder:6.7b')
     
     @staticmethod
     def init_app(app):
