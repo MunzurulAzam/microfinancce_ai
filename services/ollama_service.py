@@ -49,14 +49,14 @@ def _build_prompt(score_result):
 
     # Collect weak parameters (score <= 2)
     weak_params = []
-    for cat_key in ['client_scoring', 'branch_scoring', 'lo_scoring']:
+    for cat_key in ['client_scoring']:  # branch_scoring, lo_scoring disabled (Client-Only Mode)
         for d in score_result[cat_key]['details']:
             if d['score'] <= 2:
                 weak_params.append(f"- {d['parameter']}: {d['score']}/5 ({d['reason']})")
 
     # Collect strong parameters (score == 5)
     strong_params = []
-    for cat_key in ['client_scoring', 'branch_scoring', 'lo_scoring']:
+    for cat_key in ['client_scoring']:  # branch_scoring, lo_scoring disabled (Client-Only Mode)
         for d in score_result[cat_key]['details']:
             if d['score'] == 5:
                 strong_params.append(f"- {d['parameter']}: {d['score']}/5 ({d['reason']})")
@@ -72,8 +72,6 @@ def _build_prompt(score_result):
 
 **Category Breakdown:**
 - Client Score: {score_result['client_scoring']['score']}/{score_result['client_scoring']['max']} ({score_result['client_scoring']['percentage']}%)
-- Branch Score: {score_result['branch_scoring']['score']}/{score_result['branch_scoring']['max']} ({score_result['branch_scoring']['percentage']}%)
-- Loan Officer Score: {score_result['lo_scoring']['score']}/{score_result['lo_scoring']['max']} ({score_result['lo_scoring']['percentage']}%)
 
 **Weak Areas (score ≤ 2):**
 {weak_str}
@@ -96,14 +94,14 @@ def _fallback_analysis(score_result):
 
     # Find weak areas
     weak = []
-    for cat_key in ['client_scoring', 'branch_scoring', 'lo_scoring']:
+    for cat_key in ['client_scoring']:  # branch_scoring, lo_scoring disabled (Client-Only Mode)
         for d in score_result[cat_key]['details']:
             if d['score'] <= 2:
                 weak.append(d['parameter'])
 
     # Find strong areas
     strong = []
-    for cat_key in ['client_scoring', 'branch_scoring', 'lo_scoring']:
+    for cat_key in ['client_scoring']:  # branch_scoring, lo_scoring disabled (Client-Only Mode)
         for d in score_result[cat_key]['details']:
             if d['score'] == 5:
                 strong.append(d['parameter'])
