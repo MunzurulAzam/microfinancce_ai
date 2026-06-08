@@ -19,12 +19,19 @@ echo "════════════════════════�
 echo ""
 
 # ── 1. Activate Python virtual environment ──────────────────────────────────
-VENV_DIR="$PROJECT_DIR/env"
-if [ -d "$VENV_DIR" ]; then
+if [ -d "$PROJECT_DIR/.venv" ]; then
+    VENV_DIR="$PROJECT_DIR/.venv"
+elif [ -d "$PROJECT_DIR/env" ]; then
+    VENV_DIR="$PROJECT_DIR/env"
+else
+    VENV_DIR=""
+fi
+
+if [ -n "$VENV_DIR" ]; then
     source "$VENV_DIR/bin/activate"
     echo "✅  Virtual environment activated: $VENV_DIR"
 else
-    echo "⚠️   No 'env' virtual environment found. Trying system Python..."
+    echo "⚠️   No virtual environment found. Trying system Python..."
 fi
 
 # ── 2. Load backend .env ────────────────────────────────────────────────────
@@ -37,9 +44,9 @@ fi
 
 # ── 3. Start Flask backend in background ───────────────────────────────────
 echo ""
-echo "🚀  Starting Flask backend..."
+echo "🚀  Starting Uvicorn backend..."
 cd "$PROJECT_DIR"
-python app.py &
+uvicorn asgi:app --host 0.0.0.0 --port 5001 --reload &
 BACKEND_PID=$!
 echo "    Backend PID: $BACKEND_PID"
 
