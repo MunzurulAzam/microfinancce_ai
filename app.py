@@ -10,6 +10,7 @@ load_dotenv()
 from flask import Flask, jsonify, request
 from config import Config
 from routes import data_bp, analysis_bp, ask_bp, evaluation_bp
+from document_verification import doc_verify_bp
 
 
 def create_app(config_class=Config):
@@ -56,6 +57,7 @@ def create_app(config_class=Config):
     app.register_blueprint(analysis_bp, url_prefix='/api/analyze')
     app.register_blueprint(ask_bp, url_prefix='/api')  # Conversational endpoint
     app.register_blueprint(evaluation_bp, url_prefix='/api')
+    app.register_blueprint(doc_verify_bp, url_prefix='/api')
     
     # Root endpoint
     @app.route('/')
@@ -81,6 +83,9 @@ def create_app(config_class=Config):
                     'GET /api/analyze/top-groups': 'Get top groups',
                     'GET /api/analyze/risk-analysis': 'Get risk analysis',
                     'GET /api/analyze/business-performance': 'Get business performance'
+                },
+                'document_verification': {
+                    'POST /api/verify-document': 'Verify if image is NID, Passport, or neither (JPEG only)'
                 }
             },
             'documentation': 'See README.md for detailed API documentation'

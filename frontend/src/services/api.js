@@ -135,6 +135,21 @@ export const analyzeGroup = async (groupName) => {
     }
 };
 
+// ─── Document Verification endpoint ──────────────────────────────────────────
+
+export const verifyDocument = async (imageFile) => {
+    try {
+        const data = new FormData();
+        data.append('document', imageFile);
+        const response = await api.post('/verify-document', data, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || error.message;
+    }
+};
+
 // ─── Evaluation endpoint ──────────────────────────────────────────────────────
 
 export const evaluateApplicant = async (formData, pdfFile) => {

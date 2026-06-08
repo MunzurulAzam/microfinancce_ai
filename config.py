@@ -41,10 +41,18 @@ class Config:
     # Ollama (Local LLM for Credit Scoring AI)
     OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
     OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'deepseek-coder:6.7b')
-    
+
+    # Ollama Vision (Document Verification — llava:7b required)
+    OLLAMA_VISION_MODEL = os.environ.get('OLLAMA_VISION_MODEL', 'llava:7b')
+    DOC_VERIFY_UPLOAD_FOLDER = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 'temp_uploads', 'doc_verify'
+    )
+    DOC_VERIFY_MAX_FILE_SIZE_MB = int(os.environ.get('DOC_VERIFY_MAX_FILE_SIZE_MB', 10))
+
     @staticmethod
     def init_app(app):
         """Initialize app with config"""
         os.makedirs(Config.DATA_FOLDER, exist_ok=True)
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
         os.makedirs(Config.MODEL_FOLDER, exist_ok=True)
+        os.makedirs(Config.DOC_VERIFY_UPLOAD_FOLDER, exist_ok=True)
