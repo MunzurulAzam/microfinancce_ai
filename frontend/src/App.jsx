@@ -5,6 +5,7 @@ import FileUpload from './components/Upload/FileUpload';
 import Dashboard from './components/Dashboard/Dashboard';
 import EvaluationForm from './components/Evaluation/EvaluationForm';
 import DocumentVerification from './components/DocumentVerification/DocumentVerification';
+import NIDVoterIDScanner from './components/NIDVoterIDScanner/NIDVoterIDScanner';
 import './styles/globals.css';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="evaluation" element={<EvaluationForm />} />
           <Route path="verify" element={<DocumentVerification />} />
+          <Route path="scan-id" element={<NIDVoterIDScanner />} />
           <Route path="clients" element={<ComingSoon page="Clients" />} />
           <Route path="risk" element={<ComingSoon page="Risk Analysis" />} />
           <Route path="*" element={<Navigate to="/" replace />} />

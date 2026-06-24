@@ -150,6 +150,22 @@ export const verifyDocument = async (imageFile) => {
     }
 };
 
+// ─── NID / VoterID Scanner endpoint ──────────────────────────────────────────
+
+export const scanIDCard = async (imageFile) => {
+    try {
+        const data = new FormData();
+        data.append('id_image', imageFile);
+        const response = await api.post('/scan-id', data, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            timeout: 60000,
+        });
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || error.message;
+    }
+};
+
 // ─── Evaluation endpoint ──────────────────────────────────────────────────────
 
 export const evaluateApplicant = async (formData, pdfFile) => {

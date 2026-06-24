@@ -42,12 +42,24 @@ class Config:
     OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
     OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'deepseek-coder:6.7b')
 
-    # Ollama Vision (Document Verification — llava:7b required)
-    OLLAMA_VISION_MODEL = os.environ.get('OLLAMA_VISION_MODEL', 'llava:7b')
+    # Ollama Vision — shared by Document Verification + NID/Voter scanner.
+    OLLAMA_VISION_MODEL = os.environ.get('OLLAMA_VISION_MODEL', 'minimax-m3:cloud')
+    # Comma-separated fallback vision models, tried if the primary is overloaded
+    # for keeps accuracy high instead of dropping to offline OCR.
+    OLLAMA_VISION_FALLBACKS = os.environ.get(
+        'OLLAMA_VISION_FALLBACKS', 'gemma3:27b-cloud'
+    )
     DOC_VERIFY_UPLOAD_FOLDER = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 'temp_uploads', 'doc_verify'
     )
     DOC_VERIFY_MAX_FILE_SIZE_MB = int(os.environ.get('DOC_VERIFY_MAX_FILE_SIZE_MB', 10))
+
+    # # NID/VoterID Scanner (Claude Vision primary, Ollama fallback when key is absent)
+    ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+    NID_SCAN_UPLOAD_FOLDER = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), 'temp_uploads', 'nid_scan'
+    )
+    NID_SCAN_MAX_FILE_SIZE_MB = int(os.environ.get('NID_SCAN_MAX_FILE_SIZE_MB', 10))
 
     @staticmethod
     def init_app(app):
@@ -56,3 +68,4 @@ class Config:
         os.makedirs(Config.UPLOAD_FOLDER, exist_ok=True)
         os.makedirs(Config.MODEL_FOLDER, exist_ok=True)
         os.makedirs(Config.DOC_VERIFY_UPLOAD_FOLDER, exist_ok=True)
+        os.makedirs(Config.NID_SCAN_UPLOAD_FOLDER, exist_ok=True)
