@@ -24,6 +24,22 @@ export const askQuestion = async (question) => {
     }
 };
 
+// ─── Warehouse Q&A (text-to-SQL over 4-country DuckDB) ────────────────────────
+
+export const askWarehouse = async (question, { country = null, summary = true } = {}) => {
+    try {
+        // SQL generation runs on a local CPU model — allow extra time.
+        const response = await api.post(
+            '/ask-ai',
+            { question, summary, country },
+            { timeout: 180000 }
+        );
+        return response.data;
+    } catch (error) {
+        throw error.response?.data || error.message;
+    }
+};
+
 // ─── Data endpoints ───────────────────────────────────────────────────────────
 
 export const uploadCSV = async (file) => {

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Bot, Upload, BarChart3, Users, AlertTriangle, FileCheck, ShieldCheck, ScanLine } from 'lucide-react';
+import { Bot, Upload, BarChart3, Users, AlertTriangle, FileCheck, ShieldCheck, ScanLine, Database } from 'lucide-react';
 import './Header.css';
 
 const Header = () => {
@@ -7,6 +7,7 @@ const Header = () => {
 
     const navItems = [
         { path: '/', label: 'Ask AI', icon: Bot },
+        { path: '/ask-ai', label: 'Data Q&A', icon: Database },
         { path: '/evaluation', label: 'Evaluation', icon: FileCheck },
         { path: '/verify', label: 'Verify Doc', icon: ShieldCheck },
         { path: '/scan-id', label: 'Scan ID', icon: ScanLine },

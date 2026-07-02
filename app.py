@@ -12,6 +12,7 @@ from config import Config
 from routes import data_bp, analysis_bp, ask_bp, evaluation_bp
 from document_verification import doc_verify_bp
 from document_verification.NID_VoterID_scanner import nid_scanner_bp
+from ask_ai.api import ask_ai_bp
 
 
 def create_app(config_class=Config):
@@ -60,6 +61,7 @@ def create_app(config_class=Config):
     app.register_blueprint(evaluation_bp, url_prefix='/api')
     app.register_blueprint(doc_verify_bp, url_prefix='/api')
     app.register_blueprint(nid_scanner_bp, url_prefix='/api')
+    app.register_blueprint(ask_ai_bp, url_prefix='/api')  # 4-country warehouse Q&A (text-to-SQL)
     
     # Root endpoint
     @app.route('/')
@@ -89,6 +91,9 @@ def create_app(config_class=Config):
                 'document_verification': {
                     'POST /api/verify-document': 'Verify if image is NID, Passport, or neither (JPEG only)',
                     'POST /api/scan-id': 'Scan NID/VoterID card — extracts name + ID number (JPEG/PNG/WebP)'
+                },
+                'ask_ai': {
+                    'POST /api/ask-ai': 'Natural-language Q&A over the 4-country (UG/KY/ZM/TZ) warehouse — text-to-SQL'
                 }
             },
             'documentation': 'See README.md for detailed API documentation'
