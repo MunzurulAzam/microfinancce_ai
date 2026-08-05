@@ -2,8 +2,8 @@
 Analysis service combining data processing with AI analysis
 """
 
-from services.data_processor import data_processor
-from models.llama_handler import llama_handler
+from portfolio.csv_store import data_processor
+from core.llm import llama_handler
 
 
 def create_client_context(client_data):

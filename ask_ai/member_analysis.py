@@ -7,7 +7,7 @@ from datetime import date, datetime
 import duckdb
 import requests
 
-from services.credit_scoring import calculate_credit_score
+from credit_scoring.scoring import calculate_credit_score
 from ask_ai.config import WAREHOUSE_PATH, OLLAMA_BASE_URL, OLLAMA_KEEP_ALIVE, ASK_AI_MODEL
 
 # Fallback base loan amount for a first-time borrower no prior loan to scale from.

@@ -9,7 +9,9 @@ load_dotenv()
 
 from flask import Flask, jsonify, request
 from config import Config
-from routes import data_bp, analysis_bp, ask_bp, evaluation_bp
+from portfolio import data_bp, analysis_bp
+from assistant import ask_bp
+from evaluation import evaluation_bp
 from document_verification import doc_verify_bp
 from document_verification.NID_VoterID_scanner import nid_scanner_bp
 from ask_ai.api import ask_ai_bp
@@ -51,7 +53,7 @@ def create_app(config_class=Config):
             return response
     
     # Auto-load data if available
-    from services.data_processor import data_processor
+    from portfolio.csv_store import data_processor
     data_processor.auto_load()
     
     # Register blueprints

@@ -3,7 +3,7 @@ Performance calculations — now powered by MSSQL (via mssql_data_service).
 CSV/data_processor dependency removed.
 """
 
-from services.mssql_data_service import (
+from portfolio.data_service import (
     get_top_performers,
     get_risk_analysis,
     get_quick_insights,

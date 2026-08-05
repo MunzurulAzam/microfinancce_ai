@@ -105,6 +105,25 @@ from ask_ai.engine import ask
 print(ask("How many active members in Tanzania?"))
 ```
 
+## Big datasets — how the sync avoids timeouts
+
+No sync query is ever "as big as the table":
+
+- **Raw tables** are pulled in small pages (keyset on identity/PK/unique index,
+  or OFFSET/FETCH over a composite key) — each page is one short query.
+- **Aggregates** are either keyset-paginated over the group key
+  (`LoanCollectionSummary` by `LoanId`) or computed **one calendar year at a
+  time** (`CollectionMonthly`, `CollectionDaily`, `ScheduleMonthly`), so even a
+  100M-row `MfLoanCollection` never produces a single long-running query.
+- **Every page is retried on a fresh connection** (`ASK_AI_PAGE_RETRIES`,
+  default 5) — a network drop or NAT idle-kill costs one page, not the table.
+- Reads run under **READ UNCOMMITTED**, so the sync never sits behind live
+  OLTP locks (a classic cause of "random" sync timeouts).
+
+Tuning knobs (env vars): `ASK_AI_SYNC_BATCH` (rows/page, default 5000),
+`ASK_AI_QUERY_TIMEOUT` (per bounded query, default 1800s),
+`ASK_AI_PAGE_RETRIES`, `ASK_AI_SYNC_RETRIES`.
+
 ## Keeping data fresh / adding a country later
 
 Re-run the sync (e.g. nightly via cron / Windows Task Scheduler):

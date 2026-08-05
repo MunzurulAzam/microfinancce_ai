@@ -54,7 +54,7 @@ SYNC_TABLES = [
 DERIVED_TABLES = [
     {
         'name': 'LoanCollectionSummary',   # one row per loan
-        'key': None,                        # full GROUP BY is ~1.2s server-side; stream result
+        'key': 'LoanId',                    # keyset-paginated GROUP BY: bounded pages, resumable
         'requires': ['MfLoanCollection'],
         'select': (
             'LoanId, '
@@ -71,7 +71,9 @@ DERIVED_TABLES = [
     },
     {
         'name': 'CollectionMonthly',        # collection trend, coarse (small)
-        'key': None,                        # tiny result  single query
+        'key': None,
+        'chunk_col': 'c.WorkDate',          # aggregate one year at a time: bounded queries
+        'chunk_from': 'MfLoanCollection c',
         'requires': ['MfLoanCollection', 'MfLoan'],
         'select': (
             'l.BranchId, l.EmployeeId, '
@@ -89,6 +91,8 @@ DERIVED_TABLES = [
     {
         'name': 'CollectionDaily',          # daily collection per branch (date-range reports)
         'key': None,
+        'chunk_col': 'c.WorkDate',
+        'chunk_from': 'MfLoanCollection c',
         'requires': ['MfLoanCollection', 'MfLoan'],
         'select': (
             'l.BranchId, '
@@ -105,6 +109,8 @@ DERIVED_TABLES = [
     {
         'name': 'ScheduleMonthly',          # expected installments (due) per branch per month
         'key': None,
+        'chunk_col': 's.PaymentDate',
+        'chunk_from': 'MfLoanSchedule s',
         'requires': ['MfLoanSchedule', 'MfLoan'],
         'select': (
             'l.BranchId, '
@@ -126,14 +132,17 @@ DATA_DIR       = os.path.join(_THIS_DIR, 'data')
 WAREHOUSE_PATH = os.environ.get('ASK_AI_WAREHOUSE', os.path.join(DATA_DIR, 'warehouse.duckdb'))
 
 
-SYNC_BATCH_SIZE = int(os.environ.get('ASK_AI_SYNC_BATCH', 2_000))
+SYNC_BATCH_SIZE = int(os.environ.get('ASK_AI_SYNC_BATCH', 5_000))
 
 
-# SYNC_QUERY_TIMEOUT = int(os.environ.get('ASK_AI_QUERY_TIMEOUT', 3_600))
-SYNC_QUERY_TIMEOUT = int(os.environ.get('ASK_AI_QUERY_TIMEOUT', 43_200))
+# page-level retry reconnects and re-issues just that page.
+SYNC_QUERY_TIMEOUT = int(os.environ.get('ASK_AI_QUERY_TIMEOUT', 1_800))
 
-
+# Whole-table retries (outer loop) — kept as a last resort.
 SYNC_RETRIES = int(os.environ.get('ASK_AI_SYNC_RETRIES', 3))
+
+# Per-page retries: a dropped connection costs one page, not the whole table.
+SYNC_PAGE_RETRIES = int(os.environ.get('ASK_AI_PAGE_RETRIES', 5))
 
 # Local Ollama model
 OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')

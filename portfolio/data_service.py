@@ -8,7 +8,7 @@ import pymssql
 from datetime import datetime, date
 from decimal import Decimal
 from config import Config
-from services.credit_scoring import calculate_credit_score
+from credit_scoring.scoring import calculate_credit_score
 
 
 # ─── DB Connection ────────────────────────────────────────────────────────────

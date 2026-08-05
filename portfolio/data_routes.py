@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
 from config import Config
-from services.mssql_data_service import get_basic_stats, get_all_clients, get_all_groups
+from portfolio.data_service import get_basic_stats, get_all_clients, get_all_groups
 
 data_bp = Blueprint('data', __name__)
 

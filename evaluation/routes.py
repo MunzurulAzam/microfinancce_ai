@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import os
 import math
 from werkzeug.utils import secure_filename
-from services.pdf_parser import parse_statement
+from evaluation.pdf_parser import parse_statement
 
 evaluation_bp = Blueprint('evaluation', __name__)
 

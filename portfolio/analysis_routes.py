@@ -4,8 +4,8 @@ Handles client and group analysis requests
 """
 
 from flask import Blueprint, request, jsonify
-from services.analyzer import analyze_client, analyze_group
-from services.performance import (
+from portfolio.analyzer import analyze_client, analyze_group
+from portfolio.performance import (
     get_top_performers,
     get_risk_analysis,
     get_quick_insights,

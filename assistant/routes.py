@@ -4,7 +4,7 @@ Intelligent question answering system
 """
 
 from flask import Blueprint, request, jsonify
-from services.mssql_data_service import (
+from portfolio.data_service import (
     get_basic_stats,
     get_all_clients,
     get_all_groups,
@@ -12,11 +12,11 @@ from services.mssql_data_service import (
     get_risk_analysis,
     get_quick_insights,
 )
-from services.analyzer import analyze_client, analyze_group
-from services.performance import get_business_performance
-from services.db_connector import search_member, get_member_full_data
-from services.credit_scoring import calculate_credit_score
-from services.ollama_service import get_ai_analysis
+from portfolio.analyzer import analyze_client, analyze_group
+from portfolio.performance import get_business_performance
+from credit_scoring.member_repo import search_member, get_member_full_data
+from credit_scoring.scoring import calculate_credit_score
+from credit_scoring.ai_advisor import get_ai_analysis
 import re
 
 ask_bp = Blueprint('ask', __name__)
@@ -510,7 +510,7 @@ def ask_endpoint():
         
         # If rules return general, try AI intent classification
         if intent == 'general':
-            from models.llama_handler import llama_handler
+            from core.llm import llama_handler
             ai_intent = llama_handler.get_intent_ai(question)
             if ai_intent:
                 intent = ai_intent
