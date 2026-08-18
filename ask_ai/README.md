@@ -1,149 +1,142 @@
-# ask_ai — 4-Country Natural-Language Q&A (Text-to-SQL)
+# ask_ai — natural-language Q&A over the DW warehouse
 
-Ask questions in plain language about the 4 country databases
-(**UG / KY / ZM / TZ**) and get **fast, accurate answers locally**, powered by a
-local Ollama model.
-
-
-## Why this design (not "training a model on the data")
-
-- A model trained on loan tables would be **stale instantly** (data changes daily)
-  and would **hallucinate numbers** — unacceptable for finance.
-- Instead: the model only writes **SQL**; the exact numbers always come from the
-  data. Accurate, current, and runs on a **CPU laptop**.
-- "Improving the model" = adding more verified `question → SQL` examples in
-  [`glossary.py`](glossary.py) — **no GPU, no retraining**.
+Ask a question in plain English, get a real answer computed from real data.
 
 ```
-question ─▶ engine.py ─▶ local Ollama (SQL) ─▶ guardrail ─▶ DuckDB warehouse ─▶ answer
-                                                              ▲
-                                          sync_warehouse.py ──┘ (the only step that
-                                                                  touches live MSSQL)
+question ─▶ prompt (schema + glossary + few-shot)
+         ─▶ local Ollama writes T-SQL
+         ─▶ guardrail (SELECT-only, single statement, TOP cap, country filter)
+         ─▶ dry-run validation on DW  ──(error)──▶ one repair retry
+         ─▶ execute on DW inside a rolled-back transaction
+         ─▶ answer + table
 ```
+
+**The model only ever writes SQL.** Every number in an answer comes straight from
+DW, because an LLM that invents figures is useless — and dangerous — in finance.
+
+## Why not fine-tune a model on the data?
+
+That was the original idea, and it does not work here. Transactional data changes
+daily, so a trained model is stale the day after training, and language models
+hallucinate numbers. Text-to-SQL keeps the model doing what it is good at
+(turning English into a query) and the database doing what it is good at
+(arithmetic).
+
+## Why no local cache / copy of the warehouse?
+
+There used to be one — a 340 MB DuckDB file rebuilt nightly from four separate
+per-country MSSQL databases. It existed to stitch those four databases into one
+queryable thing.
+
+`DW` already is that. Every table carries `CountryId` and `CountryCode`
+(UG / KY / ZM / TZ), so one connection answers both single-country and
+cross-country questions. And DW is fast: portfolio-by-country returns in ~0.3 s,
+a monthly trend over the 20.6M-row `MfLoanCollection` in ~1 s. A local copy would
+add staleness and a nightly ETL to maintain, and buy nothing.
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `config.py` | 4 country connection profiles + warehouse path + model name (all env-overridable) |
-| `db_sources.py` | MSSQL connection factory |
-| `sync_warehouse.py` | ETL: copy the 4 DBs → `data/warehouse.duckdb` (tagged by `country`) |
-| `schema.py` | Reads the warehouse schema to feed the model |
-| `glossary.py` | Business definitions + verified example queries (the model's knowledge) |
-| `engine.py` | question → SQL → guardrail → run → answer |
-| `api.py` | Flask blueprint: `POST /api/ask-ai` |
-
-> Dependency: this module needs `duckdb`, which is listed in the **project's
-> top-level `requirements.txt`** (no separate requirements file here).
-
-### What's in the warehouse
-
-Raw copies of the analytic tables (`MfMember`, `MfLoan`, `MfGroup`, `AdBranch`,
-`HrEmployee`, `MfMemberBusiness`, `MfMemberAdditionalInfo`, `MfLoanGrantor`),
-each tagged with a `country` column.
-
-`MfLoanCollection` is **NOT copied raw** — it is ~13M rows/country and too slow to
-pull over the remote link. Instead the sync pulls two small **server-side
-aggregates** (fast, computed on SQL Server) that cover the reports you need:
-
-| Warehouse table | Grain | Use for |
-|-----------------|-------|---------|
-| `LoanCollectionSummary` | one row per loan | overdue (count + amount), total collected per loan |
-| `CollectionMonthly` | branch × officer × month | collection **trend** over time |
-
-Outstanding figures come straight from `MfLoan` (`PrincipalOutstanding`,
-`InterestOutstanding`, `TotalOutstanding`) — no collection detail required.
-Add or change these in `DERIVED_TABLES` in [config.py](config.py).
+| File | What it does |
+|---|---|
+| `config.py` | DW credentials (from env), table allowlist, pool + cache knobs |
+| `db.py` | Connection pool, `validate_sql()`, `run_sql()`, `query()` |
+| `cache.py` | Small TTL cache (schema + results) |
+| `schema.py` | Cached `INFORMATION_SCHEMA` introspection of the allowlisted tables |
+| `glossary.py` | Business rules, metric CTEs, verified question→SQL examples |
+| `prompt.py` | Table routing + prompt assembly |
+| `sql_guard.py` | Makes model output safe: one read-only SELECT, capped, country-scoped |
+| `llm.py` | Ollama client (`/api/generate`), retries, actionable errors |
+| `engine.py` | Orchestration: route → generate → validate → repair → execute |
+| `member_analysis.py` | The other branch: credit score + decision for one member |
+| `api.py` | Flask blueprint `POST /api/ask-ai` |
+| `check_examples.py` | Self-check: runs every example against DW + asserts routing |
 
 ## Setup
 
 ```bash
-# 1. Install dependencies (duckdb is included in the project's requirements.txt)
-pip install -r requirements.txt
-
-# 2. Make sure a local code model is available (default: deepseek-coder:6.7b,
-#    already used by this project). For a specialized alternative:
-#      ollama pull sqlcoder:7b   &&   export ASK_AI_MODEL=sqlcoder:7b
-ollama pull deepseek-coder:6.7b
-
-# 3. Build the local warehouse from the 4 country databases (first run)
-python -m ask_ai.sync_warehouse
+cp .env.example .env      # then fill in DW_* credentials
+ollama pull qwen2.5:7b-instruct
+python app.py
 ```
 
-The warehouse is a single file: `ask_ai/data/warehouse.duckdb` (gitignored).
-
-## Ask questions
-
-The endpoint is registered in the main app:
+## Use
 
 ```bash
 curl -X POST http://localhost:5001/api/ask-ai \
   -H 'Content-Type: application/json' \
-  -d '{"question": "Total loan portfolio across all countries?"}'
+  -d '{"question": "Total outstanding portfolio by country?"}'
 ```
 
-Response:
+| Field | Meaning |
+|---|---|
+| `question` | required |
+| `country` | `UG` / `KY` / `ZM` / `TZ`, or omit / `ALL` for all four |
+| `summary` | `false` skips the natural-language sentence — fastest path |
 
-```json
-{
-  "success": true,
-  "answer": "The combined active loan portfolio across all 4 countries is ...",
-  "sql": "SELECT SUM(PrincipalAmount) ... ",
-  "columns": ["total_portfolio"],
-  "rows": [{"total_portfolio": 12345678}],
-  "row_count": 1
-}
-```
+`country` is a real filter, not a hint: the guard rejects any generated SQL that
+does not carry `CountryCode = '<country>'`, and rejects SQL that filters on a
+different country.
 
-Add `"summary": false` for the fastest response (skips the natural-language
-phrasing and returns the table only).
+Response: `{success, question, sql, columns, rows, row_count, answer, mode}`.
+The `sql` is always returned so a wrong answer is easy to diagnose.
 
-You can also call the engine directly from Python:
+## Improving accuracy
 
-```python
-from ask_ai.engine import ask
-print(ask("How many active members in Tanzania?"))
-```
+Accuracy comes from the prompt, not the database. In order of impact:
 
-## Big datasets — how the sync avoids timeouts
+1. Add a verified question→SQL pair to `EXAMPLES` in `glossary.py`.
+2. Correct or extend the rules in `GLOSSARY`.
+3. Add keywords to `_TABLE_KEYWORDS` in `prompt.py` so the right table reaches
+   the prompt.
 
-No sync query is ever "as big as the table":
-
-- **Raw tables** are pulled in small pages (keyset on identity/PK/unique index,
-  or OFFSET/FETCH over a composite key) — each page is one short query.
-- **Aggregates** are either keyset-paginated over the group key
-  (`LoanCollectionSummary` by `LoanId`) or computed **one calendar year at a
-  time** (`CollectionMonthly`, `CollectionDaily`, `ScheduleMonthly`), so even a
-  100M-row `MfLoanCollection` never produces a single long-running query.
-- **Every page is retried on a fresh connection** (`ASK_AI_PAGE_RETRIES`,
-  default 5) — a network drop or NAT idle-kill costs one page, not the table.
-- Reads run under **READ UNCOMMITTED**, so the sync never sits behind live
-  OLTP locks (a classic cause of "random" sync timeouts).
-
-Tuning knobs (env vars): `ASK_AI_SYNC_BATCH` (rows/page, default 5000),
-`ASK_AI_QUERY_TIMEOUT` (per bounded query, default 1800s),
-`ASK_AI_PAGE_RETRIES`, `ASK_AI_SYNC_RETRIES`.
-
-## Keeping data fresh / adding a country later
-
-Re-run the sync (e.g. nightly via cron / Windows Task Scheduler):
+After any change to `EXAMPLES` or to the router, run:
 
 ```bash
-python -m ask_ai.sync_warehouse                 # refresh everything
-python -m ask_ai.sync_warehouse --country KY    # refresh just Kenya
+python -m ask_ai.check_examples
 ```
 
-**To add a NEW connection string / country later:** add a profile to `COUNTRIES`
-in [`config.py`](config.py) and run `python -m ask_ai.sync_warehouse --country XX`.
-That's it — **no model retraining**. Because each row is tagged by `country`,
-a re-sync of one country **never touches** the others, and data already synced
-stays answerable even if a source connection string later changes or is removed
-(answers come from the local warehouse, not the live DB).
+It checks two things, neither needing the LLM: every example still executes
+against DW, and questions route to the right pipeline. An example that does not
+run is a prompt actively teaching the model to be wrong.
+
+### Rules that matter most
+
+- **`LoanStatus = 1` is the only active status.** `TotalOutstanding` is *not*
+  zeroed when a loan closes, so an unfiltered portfolio total comes out roughly
+  5× too large.
+- **Every join must also match `CountryId`.** Business ids are only unique within
+  a country; without it, rows multiply across countries.
+- **`MfMember` has no `BranchId`.** A member reaches a branch only through
+  `MfMember.GroupId → MfGroup.BranchId → AdBranch`. DW declares no foreign keys,
+  so every join path lives in `JOIN_RULES` in `glossary.py` — that block is
+  shared by the first prompt and the repair prompt.
+- **member = client = customer = user.** All mean `MfMember`. Only *borrower*
+  differs: it implies an active loan.
+
+### Routing
+
+Credit analysis is for one identifiable person. A `CLN…` code (or a bare member
+id) routes there outright; a phrase like "assess client X" routes there only if
+the question has no aggregate wording (`total`, `list`, `all`, `how many`,
+`branch`, `each`, …). That veto is what stops "give me Nyangusu this branch
+total member name" being read as somebody's name.
 
 ## Safety
 
-- Generated SQL is guarded: **SELECT-only**, write/DDL keywords are rejected, and
-  a `LIMIT` is auto-applied. Queries run on a **read-only** DuckDB connection, and
-  the warehouse is only a copy — your production MSSQL is never written to.
-- Credentials are env-overridable; in production set `MSSQL_*` via environment
-  variables and keep `ask_ai/data/` out of git (already in `.gitignore`).
+The DW login has write and DDL rights, so model output passes four independent
+layers before anything touches the server:
+
+1. **Guard** (`sql_guard.py`) — one statement only, must start `SELECT`/`WITH`,
+   write/DDL keywords rejected (checked outside string literals, so
+   `WHERE MemberStatus = 'Deleted'` is fine), `TOP (n)` injected, country filter
+   enforced.
+2. **Dry run** (`db.validate_sql`) — `sp_describe_first_result_set` compiles the
+   query without executing it (~0.4 s), catching hallucinated tables and columns.
+3. **Rolled-back transaction** — execution is wrapped in `BEGIN TRANSACTION` …
+   `ROLLBACK`, so a write that somehow got through still cannot commit.
+4. **Limits** — `READ UNCOMMITTED` and `LOCK_TIMEOUT` so an analytical scan never
+   blocks a production writer; a statement timeout; and a row cap.
+
+`AcVoucherMaster` / `AcVoucherDetail` (44M / 109M rows, clustered PK only) are
+deliberately left out of the allowlist — any ad-hoc aggregate over them is a
+guaranteed full scan.

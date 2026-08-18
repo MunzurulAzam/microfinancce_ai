@@ -63,7 +63,11 @@ def create_app(config_class=Config):
     app.register_blueprint(evaluation_bp, url_prefix='/api')
     app.register_blueprint(doc_verify_bp, url_prefix='/api')
     app.register_blueprint(nid_scanner_bp, url_prefix='/api')
-    app.register_blueprint(ask_ai_bp, url_prefix='/api')  # 4-country warehouse Q&A (text-to-SQL)
+    app.register_blueprint(ask_ai_bp, url_prefix='/api')  # DW warehouse Q&A (text-to-SQL)
+
+    # Cache the DW schema up front so the first question does not pay for it.
+    from ask_ai import schema as ask_ai_schema
+    ask_ai_schema.warm()
     
     # Root endpoint
     @app.route('/')
@@ -95,7 +99,7 @@ def create_app(config_class=Config):
                     'POST /api/scan-id': 'Scan NID/VoterID card — extracts name + ID number (JPEG/PNG/WebP)'
                 },
                 'ask_ai': {
-                    'POST /api/ask-ai': 'Natural-language Q&A over the 4-country (UG/KY/ZM/TZ) warehouse — text-to-SQL'
+                    'POST /api/ask-ai': 'Natural-language Q&A over the DW warehouse, all 4 countries (UG/KY/ZM/TZ) — text-to-SQL'
                 }
             },
             'documentation': 'See README.md for detailed API documentation'

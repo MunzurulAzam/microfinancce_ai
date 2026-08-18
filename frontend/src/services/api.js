@@ -24,7 +24,7 @@ export const askQuestion = async (question) => {
     }
 };
 
-// ─── Warehouse Q&A (text-to-SQL over 4-country DuckDB) ────────────────────────
+// ─── Warehouse Q&A (text-to-SQL over the DW warehouse, all 4 countries) ───────
 
 export const askWarehouse = async (question, { country = null, summary = true } = {}) => {
     try {
@@ -32,7 +32,7 @@ export const askWarehouse = async (question, { country = null, summary = true } 
         const response = await api.post(
             '/ask-ai',
             { question, summary, country },
-            { timeout: 180000 }
+            { timeout: 90000 }
         );
         return response.data;
     } catch (error) {

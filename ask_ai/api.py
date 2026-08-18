@@ -2,6 +2,7 @@
 
 from flask import Blueprint, request, jsonify
 
+from ask_ai.config import COUNTRY_CODES
 from ask_ai.engine import route
 
 ask_ai_bp = Blueprint('ask_ai', __name__)
@@ -19,13 +20,25 @@ def ask_ai_endpoint():
             'example': {'question': 'Total loan portfolio across all countries?'},
         }), 400
 
-    # Optional country hint (UG/KY/ZM/TZ) — used by the member-analysis branch.
+    # Country scope (UG/KY/ZM/TZ). Absent or 'ALL' means all four countries.
     country = (data.get('country') or '').strip().upper() or None
-    if country in ('ALL', ''):
+    if country == 'ALL':
         country = None
+    if country and country not in COUNTRY_CODES:
+        return jsonify({
+            'success': False,
+            'error': f'Unknown country "{country}". Use one of: '
+                     f'{", ".join(COUNTRY_CODES)}, or omit for all countries.',
+        }), 400
+
     # Set summary=false for the fastest response (raw table only, no NL phrasing).
     with_summary = bool(data.get('summary', True))
 
     # Router picks: member analysis (score + decision + amount) OR text-to-SQL.
     result = route(question, country=country, with_summary=with_summary)
-    return jsonify(result), (200 if result.get('success') else 500)
+
+    if result.get('success'):
+        return jsonify(result), 200
+    # A question we could not turn into valid SQL is the caller's input problem,
+    # not a server fault — only genuine failures should read as 500.
+    return jsonify(result), (400 if result.get('bad_request') else 500)

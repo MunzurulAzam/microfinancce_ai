@@ -4,7 +4,7 @@ import { askWarehouse } from '../../services/api';
 import Button from '../Common/Button';
 import './AskWarehouse.css';
 
-// Country chips — "All" means no country filter (combined across the 4 DBs).
+// Country chips — "All" means no country filter (combined across all 4 countries).
 const COUNTRIES = [
     { code: 'ALL', label: 'All countries', flag: '🌍' },
     { code: 'UG', label: 'Uganda', flag: '🇺🇬' },
@@ -37,15 +37,6 @@ const AskWarehouse = () => {
     const [error, setError] = useState(null);
     const [showSql, setShowSql] = useState(false);
 
-    const buildQuestion = () => {
-        const q = input.trim();
-        if (!q) return q;
-        // Nudge the model toward a single country when a chip is selected.
-        const c = COUNTRIES.find((x) => x.code === country);
-        if (country !== 'ALL' && c) return `${q} (for ${c.label} only)`;
-        return q;
-    };
-
     const submit = async (e) => {
         e?.preventDefault();
         if (!input.trim() || loading) return;
@@ -56,7 +47,9 @@ const AskWarehouse = () => {
         setShowSql(false);
 
         try {
-            const data = await askWarehouse(buildQuestion(), {
+            // The country chip is enforced server-side as a real CountryCode
+            // filter, so the question text is sent exactly as typed.
+            const data = await askWarehouse(input.trim(), {
                 country: country === 'ALL' ? null : country,
             });
             if (data.success) {
@@ -173,6 +166,15 @@ const AskWarehouse = () => {
                         </div>
                     )}
 
+                    {/* The country chip could not be confirmed in the SQL — say so
+                        rather than let the numbers read as scoped when they may not be. */}
+                    {result.country_enforced === false && (
+                        <div className="ma-note">
+                            <AlertCircle size={14} />
+                            Could not confirm this query is limited to {result.country} — check the SQL.
+                        </div>
+                    )}
+
                     {/* Collapsible SQL */}
                     {result.sql && (
                         <div className="wq-sql-block">
@@ -186,7 +188,12 @@ const AskWarehouse = () => {
                     )}
 
                     {/* Results table */}
-                    <ResultTable columns={result.columns} rows={result.rows} count={result.row_count} />
+                    <ResultTable
+                        columns={result.columns}
+                        rows={result.rows}
+                        count={result.row_count}
+                        truncated={result.truncated}
+                    />
                 </div>
             )}
         </div>
@@ -258,6 +265,14 @@ const MemberAnalysisCard = ({ r }) => {
                 </div>
             )}
 
+            {/* Member codes repeat across countries — never let the reader assume
+                this is the person they meant. */}
+            {r.match_note && (
+                <div className="ma-note">
+                    <AlertCircle size={14} /> {r.match_note}
+                </div>
+            )}
+
             {r.other_matches?.length > 0 && (
                 <div className="ma-others">Other matches: {r.other_matches.join(' · ')}</div>
             )}
@@ -265,7 +280,7 @@ const MemberAnalysisCard = ({ r }) => {
     );
 };
 
-const ResultTable = ({ columns, rows, count }) => {
+const ResultTable = ({ columns, rows, count, truncated }) => {
     if (!columns || columns.length === 0) return null;
     if (!rows || rows.length === 0) {
         return <div className="wq-empty">Query ran successfully but returned no rows.</div>;
@@ -273,7 +288,10 @@ const ResultTable = ({ columns, rows, count }) => {
 
     return (
         <div className="wq-table-wrap">
-            <div className="wq-table-meta">{count} row{count === 1 ? '' : 's'}</div>
+            <div className="wq-table-meta">
+                {count} row{count === 1 ? '' : 's'}
+                {truncated && ' (capped — narrow the question for the full set)'}
+            </div>
             <div className="wq-table-scroll">
                 <table className="wq-table">
                     <thead>

@@ -1,194 +1,42 @@
 
 
-import os
 import re
 
-import duckdb
-import requests
+from ask_ai import db, llm
+from ask_ai.cache import TTLCache
+from ask_ai.config import RESULT_CACHE_TTL
+from ask_ai.prompt import build_prompt, build_repair_prompt
+from ask_ai.sql_guard import has_country_filter, sanitize, strip_limit, UnsafeSQL
 
-from ask_ai.config import (
-    OLLAMA_BASE_URL,
-    ASK_AI_MODEL,
-    OLLAMA_KEEP_ALIVE,
-    WAREHOUSE_PATH,
-    MAX_RESULT_ROWS,
-)
-from ask_ai import schema as schema_mod
-from ask_ai.glossary import GLOSSARY, examples_text
+# The same handful of questions get asked over and over (the UI ships canned
+# examples), so a successful answer is worth keeping for a few minutes.
+_results = TTLCache(RESULT_CACHE_TTL, max_entries=128)
 
 
-#  Relevant-table selection
-
-_CORE_TABLES = ['MfMember', 'MfLoan']
-_TABLE_KEYWORDS = {
-    'MfMember':               ['member', 'client', 'customer', 'borrower', 'people',
-                               'women', 'woman', 'female', 'men', 'male', 'gender', 'age'],
-    'MfLoan':                 ['loan', 'portfolio', 'principal', 'disburse', 'cycle',
-                               'amount', 'outstanding'],
-    'LoanCollectionSummary':  ['collection', 'collected', 'overdue', 'arrear', 'repay',
-                               'par', 'installment', 'instalment', 'default', 'late'],
-    'CollectionMonthly':      ['trend', 'monthly', 'month', 'over time', 'per month',
-                               'by month', 'collection', 'collected'],
-    'CollectionDaily':        ['daily', 'day', 'today', 'per day', 'date range',
-                               'last 7 days', 'this week'],
-    'ScheduleMonthly':        ['schedule', 'due', 'expected', 'expected vs',
-                               'installment due', 'demand'],
-    'AcFisTrialBalanceReportData': ['trial balance', 'balance sheet', 'profit',
-                               'loss', 'p&l', 'income', 'expense', 'ledger balance',
-                               'financial', 'accounting', 'gl', 'closing balance'],
-    'AcLedger':               ['ledger', 'account', 'chart of accounts', 'accounting', 'gl'],
-    'MfMemberDeposit':        ['savings', 'saving', 'deposit', 'dps'],
-    'MfBadDebtsCollection':   ['bad debt', 'baddebt', 'write off', 'written off', 'recovery'],
-    'MfGroup':                ['group'],
-    'AdBranch':               ['branch'],
-    'HrEmployee':             ['employee', 'officer', 'staff', ' lo ', 'loan officer'],
-    'MfMemberBusiness':       ['business', 'sector', 'industry', 'occupation', 'trade'],
-    'MfMemberAdditionalInfo': ['additional info', 'extra info'],
-    'MfLoanGrantor':          ['guarantor', 'grantor'],
-}
-
-
-def _select_tables(question):
-    q = f" {question.lower()} "
-    available = set(schema_mod.get_table_names())
-    chosen = [t for t in _CORE_TABLES if t in available]
-    for table, keywords in _TABLE_KEYWORDS.items():
-        if table in available and table not in chosen:
-            if any(kw in q for kw in keywords):
-                chosen.append(table)
-    # Fall back to everything if nothing in the warehouse matched our core list.
-    return chosen or list(available)
-
-
-# Prompt construction
-def build_prompt(question):
-    tables = _select_tables(question)
-    schema_text = schema_mod.get_schema_text(tables)
-    return f"""You are an expert data analyst. Generate ONE DuckDB SQL query that
-answers the user's question about a microfinance database covering 4 countries.
-
-Rules:
-- Output ONLY the SQL query. No explanation, no markdown, no comments.
-- Use only the tables and columns shown in the schema.
-- It must be a single read-only SELECT statement.
-
-{GLOSSARY}
-
-Database schema:
-{schema_text}
-
-Example questions and the correct SQL:
-{examples_text()}
-
--- Question: {question}
-"""
-
-
-#  Call the local Ollama model
-def generate_sql(question, timeout=120):
-    prompt = build_prompt(question)
-    resp = requests.post(
-        f"{OLLAMA_BASE_URL}/api/generate",
-        json={
-            'model': ASK_AI_MODEL,
-            'prompt': prompt,
-            'stream': False,
-            'keep_alive': OLLAMA_KEEP_ALIVE,
-            'options': {
-                'temperature': 0,        # deterministic SQL
-                'num_predict': 400,
-            },
-        },
-        timeout=timeout,
-    )
-    resp.raise_for_status()
-    return resp.json().get('response', '')
-
-
-#  Guardrail: make the SQL safe to run
-_FORBIDDEN = re.compile(
-    r'\b(insert|update|delete|drop|alter|create|attach|detach|copy|pragma|'
-    r'export|import|truncate|replace|call|set|grant|revoke)\b',
-    re.IGNORECASE,
-)
-
-
-def sanitize_sql(raw):
-    """Clean model output and reject anything that is not a single SELECT."""
-    sql = raw.strip()
-
-    # Strip ```sql ... ``` fences if present.
-    fence = re.search(r"```(?:sql)?\s*(.*?)```", sql, re.DOTALL | re.IGNORECASE)
-    if fence:
-        sql = fence.group(1).strip()
-
-    # Keep only the first statement.
-    sql = sql.split(';')[0].strip()
-    if not sql:
-        raise ValueError("Model returned an empty query.")
-
-    lowered = sql.lower()
-    if not (lowered.startswith('select') or lowered.startswith('with')):
-        raise ValueError("Only SELECT queries are allowed.")
-    if _FORBIDDEN.search(sql):
-        raise ValueError("Query contains a disallowed (write/DDL) keyword.")
-
-    # Cap row count if the model did not.
-    if not re.search(r'\blimit\b', lowered):
-        sql = f"{sql}\nLIMIT {MAX_RESULT_ROWS}"
-    return sql
-
-
-#  Execute on the read-only warehouse
-def run_sql(sql):
-    if not os.path.exists(WAREHOUSE_PATH):
-        raise FileNotFoundError(
-            f"Warehouse not found at {WAREHOUSE_PATH}. "
-            "Run:  python -m ask_ai.sync_warehouse"
-        )
-    con = duckdb.connect(WAREHOUSE_PATH, read_only=True)
-    try:
-        cur = con.execute(sql)
-        columns = [d[0] for d in cur.description]
-        rows = [dict(zip(columns, r)) for r in cur.fetchall()]
-        return columns, rows
-    finally:
-        con.close()
-
-
-#   phrase a one-line natural-language answer
-def summarize(question, columns, rows, timeout=60):
-    preview = rows[:20]
-    resp = requests.post(
-        f"{OLLAMA_BASE_URL}/api/generate",
-        json={
-            'model': ASK_AI_MODEL,
-            'prompt': (
-                "Answer the user's question in ONE short sentence using the data.\n"
-                f"Question: {question}\n"
-                f"Columns: {columns}\n"
-                f"Rows: {preview}\n"
-                "Answer:"
-            ),
-            'stream': False,
-            'keep_alive': OLLAMA_KEEP_ALIVE,
-            'options': {'temperature': 0.2, 'num_predict': 120},
-        },
-        timeout=timeout,
-    )
-    resp.raise_for_status()
-    return resp.json().get('response', '').strip()
+def _cache_key(question, country, with_summary):
+    return (' '.join(question.lower().split()), country, with_summary)
 
 
 #  member-analysis vs data question
+# Credit analysis is only ever about ONE identifiable person. A member code is
+# that proof; a phrase like "give me ... member ..." is not, and used to swallow
+# whole-branch questions such as "give me Nyangusu this branch total member name".
 _MEMBER_CODE = re.compile(r'\bCLN\d+\b', re.IGNORECASE)
+_MEMBER_ID = re.compile(r'^\s*\d{3,}\s*$')
 
+# Aggregate wording means the question is about a set of people, not a person —
+# it vetoes every phrase hint below.
+_AGGREGATE = re.compile(
+    r'\b(total|totals|list|all|how many|count|counts|each|per|every|top|'
+    r'average|avg|sum|names|breakdown|compare|trend|branch|branches|group|'
+    r'groups|report|highest|lowest|most|least)\b',
+    re.IGNORECASE,
+)
 
 _STRONG_HINTS = [
     'analyze member', 'analyse member', 'analyze client', 'analyse client',
     'credit score for', 'member information', 'member info', 'member details',
-    'this member', 'about .*member', 'information (about|on|of)', 'profile of',
-    'details of', 'give me .*member', 'assess member', 'assess client',
+    'this member', 'profile of', 'assess member', 'assess client',
 ]
 
 _WEAK_HINTS = [
@@ -198,23 +46,35 @@ _WEAK_HINTS = [
 ]
 
 
+def _names_one_person(question):
+    """A member code (or a bare member id) identifies exactly one person, so it
+    outranks any aggregate wording — "all loans of CLN0189567" is still about
+    that member."""
+    return bool(_MEMBER_CODE.search(question)) or bool(_MEMBER_ID.match(question))
+
+
 def _is_strong(question):
+    if _names_one_person(question):
+        return True
+    if _AGGREGATE.search(question):
+        return False
     q = question.lower()
-    return bool(_MEMBER_CODE.search(question)) or any(re.search(h, q) for h in _STRONG_HINTS)
+    return any(re.search(h, q) for h in _STRONG_HINTS)
 
 
 def _is_weak(question):
+    if _AGGREGATE.search(question):
+        return False
     q = question.lower()
     return any(re.search(h, q) for h in _WEAK_HINTS)
 
 
 def is_member_analysis(question):
-    """True if the question could be about assessing a specific member."""
+    """True if the question is about assessing one specific member."""
     return _is_strong(question) or _is_weak(question)
 
 
 def route(question, country=None, with_summary=True):
-
     strong = _is_strong(question)
     if strong or _is_weak(question):
         from ask_ai.member_analysis import analyze_member
@@ -222,48 +82,137 @@ def route(question, country=None, with_summary=True):
         if analysis.get('success') or strong:
             return analysis
         # weak intent + no member matched → treat as a data question.
-    result = ask(question, with_summary=with_summary)
+    result = ask(question, country=country, with_summary=with_summary)
     result['mode'] = 'sql'
     return result
 
 
-#  Public entry point
-def ask(question, with_summary=True):
+def _generate_sql(question, country):
+    """Ask the model for SQL, then make it safe.
+
+    Returns (sql, raw, error, caller_fault) — caller_fault distinguishes "we
+    could not turn your question into SQL" (a 400) from Ollama or DW being down
+    (a 500).
     """
-    Answer a natural-language question.
+    try:
+        prompt = build_prompt(question, country)
+    except db.QueryError as e:
+        # Building the prompt reads the DW schema, so DW being down surfaces here.
+        return None, None, f'Warehouse unavailable: {e}', False
+
+    result = llm.generate(prompt)
+    if not result['success']:
+        return None, None, result['error'], False
+
+    raw = result['text']
+    try:
+        return sanitize(strip_limit(raw or ''), country=country), raw, None, True
+    except UnsafeSQL as e:
+        if not getattr(e, 'fixable', False):
+            return None, raw, str(e), True
+        # Aimed at the wrong country — as repairable as a bad column name.
+        fixed, fix_error = _repair_sql(question, raw, str(e), country)
+        if fixed:
+            return fixed, raw, None, True
+        return None, raw, fix_error or str(e), True
+
+
+def _repair_sql(question, sql, error, country):
+    """One retry, handed the failed SQL and the server's own complaint. Much
+    cheaper and more effective than regenerating from a cold prompt."""
+    result = llm.generate(build_repair_prompt(question, sql, error, country))
+    if not result['success']:
+        return None, result['error']
+    try:
+        return sanitize(strip_limit(result['text'] or ''), country=country), None
+    except UnsafeSQL as e:
+        return None, str(e)
+
+
+def ask(question, country=None, with_summary=True):
+    """
+    Answer a natural-language question against DW.
     Returns: {success, question, sql, columns, rows, row_count, answer?, error?}
     """
     if not question or not question.strip():
-        return {'success': False, 'error': 'Empty question.'}
+        return {'success': False, 'error': 'Empty question.', 'bad_request': True}
 
-    raw_sql = None
-    try:
-        raw_sql = generate_sql(question)
-        sql = sanitize_sql(raw_sql)
-    except requests.exceptions.RequestException as e:
-        return {'success': False, 'error': f'Ollama unavailable: {e}'}
-    except ValueError as e:
-        return {'success': False, 'error': str(e), 'sql': raw_sql}
+    key = _cache_key(question, country, with_summary)
+    cached = _results.get(key)
+    if cached is not None:
+        return dict(cached, cached=True)
+
+    sql, raw, error, caller_fault = _generate_sql(question, country)
+    if not sql:
+        return {'success': False, 'error': error, 'sql': raw,
+                'bad_request': caller_fault}
+
+    # The model was told the scope, but it may express it some other way (a
+    # branch that exists in one country only) or forget it. Ask once, then get
+    # on with it — blocking the user over a filter we cannot prove is missing
+    # rejected correct queries.
+    country_enforced = has_country_filter(sql, country)
+    if country and not country_enforced:
+        scoped, _ = _repair_sql(
+            question, sql,
+            f"The answer must cover {country} only, but the query has no country "
+            f"filter. Add CountryCode = '{country}' to it.",
+            country)
+        if scoped and has_country_filter(scoped, country):
+            ok, _, _ = db.validate_sql(scoped)
+            if ok:
+                sql, country_enforced = scoped, True
+
+    # Dry run: catches hallucinated tables and columns in ~0.4s, before the
+    # server pays for a scan — and gives the repair prompt something concrete.
+    ok, validation_error, _ = db.validate_sql(sql)
+    if not ok:
+        repaired, repair_error = _repair_sql(question, sql, validation_error, country)
+        if repaired:
+            ok, second_error, _ = db.validate_sql(repaired)
+            if ok:
+                sql = repaired
+            else:
+                return _invalid(question, sql, validation_error, repaired, second_error)
+        else:
+            return _invalid(question, sql, validation_error, None, repair_error)
 
     try:
-        columns, rows = run_sql(sql)
-    except Exception as e:
-        # Surface the SQL so a bad generation is easy to debug / add as an example.
+        columns, rows, truncated = db.run_sql(sql)
+    except db.QueryError as e:
         return {'success': False, 'error': f'SQL execution failed: {e}', 'sql': sql}
 
     result = {
         'success': True,
         'question': question,
+        'country': country,
         'sql': sql,
         'columns': columns,
         'rows': rows,
         'row_count': len(rows),
+        'truncated': truncated,
     }
+    if country:
+        # False = we could not confirm the query is scoped to that country, so
+        # the caller can say so rather than mislabel the numbers.
+        result['country_enforced'] = country_enforced
 
     if with_summary:
-        try:
-            result['answer'] = summarize(question, columns, rows)
-        except requests.exceptions.RequestException:
-            result['answer'] = None  # data is still returned even if phrasing fails
+        result['answer'] = llm.summarize(question, columns, rows)
 
+    _results.set(key, result)
     return result
+
+
+def _invalid(question, sql, error, repaired, repair_error):
+    """Both attempts failed — return them so a bad generation is easy to debug
+    and easy to turn into a new few-shot example in glossary.py."""
+    return {
+        'success': False,
+        'question': question,
+        'error': f'Could not build valid SQL for that question. {error}',
+        'sql': sql,
+        'attempted_fix': repaired,
+        'fix_error': repair_error,
+        'bad_request': True,
+    }

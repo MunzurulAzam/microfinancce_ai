@@ -20,9 +20,6 @@ htmlcov/
 data/uploads/*
 !data/uploads/.gitkeep
 
-# ask_ai local warehouse (generated copy of the 4 country DBs — never commit)
-ask_ai/data/
-
 models/*.gguf
 !models/.gitkeep
 .vscode/

@@ -472,6 +472,18 @@
     color: var(--text-muted);
 }
 
+.ma-note {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    color: #92400E;
+    background: #FEF3C7;
+    border: 1px solid #FDE68A;
+    border-radius: 6px;
+    padding: 0.5rem 0.65rem;
+}
+
 @media (max-width: 600px) {
     .wq-subtitle { font-size: 0.85rem; }
     .wq-title { font-size: 1.3rem; }

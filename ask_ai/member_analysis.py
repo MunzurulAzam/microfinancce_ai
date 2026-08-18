@@ -4,39 +4,31 @@ import os
 import re
 from datetime import date, datetime
 
-import duckdb
-import requests
-
 from credit_scoring.scoring import calculate_credit_score
-from ask_ai.config import WAREHOUSE_PATH, OLLAMA_BASE_URL, OLLAMA_KEEP_ALIVE, ASK_AI_MODEL
+from ask_ai import db, llm
 
-# Fallback base loan amount for a first-time borrower no prior loan to scale from.
+# Fallback base loan amount for a first-time borrower — no prior loan to scale from.
 FIRST_CYCLE_BASE = float(os.environ.get('ASK_AI_FIRST_CYCLE_BASE', 0))
 
-
-ANALYSIS_MODEL = os.environ.get('ASK_AI_ANALYSIS_MODEL') or ASK_AI_MODEL
-
-
-# small DuckDB helpers
-def _open():
-    return duckdb.connect(WAREHOUSE_PATH, read_only=True)
+ANALYSIS_MODEL = os.environ.get('ASK_AI_ANALYSIS_MODEL') or None
 
 
-def _rows(con, sql, params=()):
+# small query helpers — all SQL here is hand-written and parameterized
+def _rows(sql, params=()):
     try:
-        cur = con.execute(sql, list(params))
-        cols = [d[0] for d in cur.description]
-        return [dict(zip(cols, r)) for r in cur.fetchall()]
-    except Exception:
+        return db.query(sql, tuple(params))
+    except db.QueryError as e:
+        # An empty result silently deflates the credit score, so make it visible.
+        print(f"[ask_ai.member_analysis] query failed: {e}")
         return []
 
 
-def _one(con, sql, params=()):
-    r = _rows(con, sql, params)
-    return r[0] if r else None
+def _one(sql, params=()):
+    rows = _rows(sql, params)
+    return rows[0] if rows else None
 
 
-# . pull the member reference code / id / name out of a full question
+# pull the member reference code / id / name out of a full question
 _STOPWORDS = re.compile(
     r'(?i)\b(how much|loan amount|analyze|analyse|member|members|client|customer|can|could|'
     r'give|given|gives|get|gets|getting|a|an|the|to|for|of|is|are|eligible|eligibility|'
@@ -60,60 +52,67 @@ def extract_member_ref(question):
 
 
 #  resolve member
-def resolve_member(con, query, country=None):
-    """Find matching members in the warehouse. Returns a list best first."""
+# MemberId and MemberCode are only unique WITHIN a country — 113k+ codes are
+# reused across the four countries — so a lookup without a country filter can
+# return several people. Rank the live, most recent record first rather than
+# letting the server's row order decide which person gets assessed.
+_BEST_FIRST = ("ORDER BY CASE WHEN MemberStatus = 'Active' THEN 0 "
+               "WHEN MemberStatus = 'Inactive' THEN 1 ELSE 2 END, "
+               "AdmissionDate DESC")
+
+
+def resolve_member(query, country=None):
+    """Find matching members in DW. Returns a list, best first."""
     q = (query or '').strip()
     if not q:
         return []
 
-    where_country = " AND country = ?" if country else ""
+    where_country = " AND CountryCode = %s" if country else ""
     cp = [country.upper()] if country else []
 
     if q.isdigit():
-        return _rows(con,
-            f"SELECT * FROM MfMember WHERE MemberId = ?{where_country}",
+        return _rows(
+            f"SELECT * FROM MfMember WHERE MemberId = %s{where_country} {_BEST_FIRST}",
             [int(q)] + cp)
 
     if q.upper().startswith('CLN'):
-        return _rows(con,
-            f"SELECT * FROM MfMember WHERE MemberCode = ?{where_country}",
+        return _rows(
+            f"SELECT * FROM MfMember WHERE MemberCode = %s{where_country} {_BEST_FIRST}",
             [q] + cp)
 
-    # Name search — every token must appear somewhere in FirstName LastName
-
+    # Name search — every token must appear somewhere in "FirstName LastName".
     parts = [p for p in q.split() if len(p) > 1]
     if parts:
-        conds = " AND ".join(["(FirstName || ' ' || LastName) ILIKE ?"] * len(parts))
-        return _rows(con,
-            f"SELECT * FROM MfMember WHERE {conds}{where_country} "
-            f"ORDER BY MemberStatus DESC LIMIT 10",
+        conds = " AND ".join(["(FirstName + ' ' + LastName) LIKE %s"] * len(parts))
+        return _rows(
+            f"SELECT TOP (10) * FROM MfMember WHERE {conds}{where_country} {_BEST_FIRST}",
             [f'%{p}%' for p in parts] + cp)
 
-    return _rows(con,
-        f"SELECT * FROM MfMember WHERE (FirstName ILIKE ? OR LastName ILIKE ? "
-        f"OR MemberCode ILIKE ?){where_country} LIMIT 10",
+    return _rows(
+        f"SELECT TOP (10) * FROM MfMember WHERE (FirstName LIKE %s OR LastName LIKE %s "
+        f"OR MemberCode LIKE %s){where_country} {_BEST_FIRST}",
         [f'%{q}%', f'%{q}%', f'%{q}%'] + cp)
 
 
-def suggest_members(con, query, country=None, limit=5):
+def suggest_members(query, country=None, limit=5):
     """Loose 'did you mean' suggestions when an exact resolve fails."""
     ref = extract_member_ref(query)
     tokens = [p for p in ref.split() if len(p) > 1]
     if not tokens:
         return []
-    where_country = " AND country = ?" if country else ""
+    where_country = " AND CountryCode = %s" if country else ""
     cp = [country.upper()] if country else []
     # Match on ANY token (loose).
-    ors = " OR ".join(["(FirstName || ' ' || LastName) ILIKE ?"] * len(tokens))
-    rows = _rows(con,
-        f"SELECT FirstName, LastName, MemberCode, country FROM MfMember "
-        f"WHERE ({ors}){where_country} LIMIT ?",
-        [f'%{t}%' for t in tokens] + cp + [limit])
-    return [f"{r['FirstName']} {r['LastName']} ({r['MemberCode']}, {r['country']})".strip()
+    ors = " OR ".join(["(FirstName + ' ' + LastName) LIKE %s"] * len(tokens))
+    rows = _rows(
+        f"SELECT TOP (%s) FirstName, LastName, MemberCode, CountryCode FROM MfMember "
+        f"WHERE ({ors}){where_country}",
+        [limit] + [f'%{t}%' for t in tokens] + cp)
+    return [f"{r['FirstName']} {r['LastName']} ({r['MemberCode']}, {r['CountryCode']})".strip()
             for r in rows]
 
 
-#  build the scoring `data` dict from the warehouse
+#  build the scoring `data` dict from DW
 def _age(dob):
     if not dob:
         return None
@@ -125,33 +124,35 @@ def _age(dob):
     return t.year - dob.year - ((t.month, t.day) < (dob.month, dob.day))
 
 
-def _collection_summary(con, country, loan_id):
-    """(total_installments, overdue_installments) for a loan from LoanCollectionSummary."""
+def _collection_summary(country_id, loan_id):
+    """(total_installments, overdue_installments) for one loan."""
     if not loan_id:
         return 0, 0
-    row = _one(con,
-        "SELECT TotalInstallments, OverdueInstallments FROM LoanCollectionSummary "
-        "WHERE LoanId = ? AND country = ?", [loan_id, country])
+    row = _one(
+        "SELECT COUNT(*) AS TotalInstallments, "
+        "       SUM(CASE WHEN OverdueAmount > 0 THEN 1 ELSE 0 END) AS OverdueInstallments "
+        "FROM MfLoanCollection WHERE LoanId = %s AND CountryId = %s",
+        [loan_id, country_id])
     if not row:
         return 0, 0
     return int(row.get('TotalInstallments') or 0), int(row.get('OverdueInstallments') or 0)
 
 
-def build_scoring_data(con, member):
-    """Assemble the dict calculate_credit_score() expects, from warehouse tables."""
-    country = member.get('country')
+def build_scoring_data(member):
+    """Assemble the dict calculate_credit_score() expects, from DW tables."""
+    country_id = member.get('CountryId')
     member_id = member.get('MemberId')
 
-    loans = _rows(con,
-        "SELECT * FROM MfLoan WHERE MemberId = ? AND country = ? ORDER BY Cycle DESC",
-        [member_id, country])
+    loans = _rows(
+        "SELECT * FROM MfLoan WHERE MemberId = %s AND CountryId = %s ORDER BY Cycle DESC",
+        [member_id, country_id])
     current_loan = loans[0] if loans else None
     prev_loan = loans[1] if len(loans) > 1 else None
 
     total_col, overdue_col = _collection_summary(
-        con, country, current_loan.get('LoanId') if current_loan else None)
+        country_id, current_loan.get('LoanId') if current_loan else None)
     if prev_loan:
-        _, prev_overdue = _collection_summary(con, country, prev_loan.get('LoanId'))
+        _, prev_overdue = _collection_summary(country_id, prev_loan.get('LoanId'))
     elif current_loan:
         prev_overdue = overdue_col
     else:
@@ -160,18 +161,18 @@ def build_scoring_data(con, member):
     def guarantor(loan):
         if not loan:
             return None
-        return _one(con,
-            "SELECT FullName, ContactNumber, GrantorType FROM MfLoanGrantor "
-            "WHERE LoanId = ? AND country = ?", [loan.get('LoanId'), country])
+        return _one(
+            "SELECT TOP (1) FullName, ContactNumber, GrantorType FROM MfLoanGrantor "
+            "WHERE LoanId = %s AND CountryId = %s", [loan.get('LoanId'), country_id])
 
     group = None
     group_count = 0
     if member.get('GroupId'):
-        group = _one(con, "SELECT * FROM MfGroup WHERE GroupId = ? AND country = ?",
-                     [member['GroupId'], country])
-        row = _one(con,
-            "SELECT COUNT(*) AS c FROM MfMember WHERE GroupId = ? AND country = ? "
-            "AND MemberStatus = 'Active'", [member['GroupId'], country])
+        group = _one("SELECT * FROM MfGroup WHERE GroupId = %s AND CountryId = %s",
+                     [member['GroupId'], country_id])
+        row = _one(
+            "SELECT COUNT(*) AS c FROM MfMember WHERE GroupId = %s AND CountryId = %s "
+            "AND MemberStatus = 'Active'", [member['GroupId'], country_id])
         group_count = int(row['c']) if row else 0
 
     branch_id = current_loan.get('BranchId') if current_loan else None
@@ -191,17 +192,18 @@ def build_scoring_data(con, member):
         'group': group,
         'group_member_count': group_count,
         'mobile_changed': False,
-        'additional_info': _one(con,
-            "SELECT * FROM MfMemberAdditionalInfo WHERE MemberId = ? AND country = ?",
-            [member_id, country]) or {},
-        'business': _one(con,
-            "SELECT * FROM MfMemberBusiness WHERE MemberId = ? AND country = ?",
-            [member_id, country]) or {},
-        'branch': _one(con, "SELECT * FROM AdBranch WHERE BranchId = ? AND country = ?",
-                       [branch_id, country]) if branch_id else None,
+        'additional_info': _one(
+            "SELECT TOP (1) * FROM MfMemberAdditionalInfo "
+            "WHERE MemberId = %s AND CountryId = %s",
+            [member_id, country_id]) or {},
+        'business': _one(
+            "SELECT TOP (1) * FROM MfMemberBusiness WHERE MemberId = %s AND CountryId = %s",
+            [member_id, country_id]) or {},
+        'branch': _one("SELECT * FROM AdBranch WHERE BranchId = %s AND CountryId = %s",
+                       [branch_id, country_id]) if branch_id else None,
         'branch_id': branch_id,
-        'employee': _one(con, "SELECT * FROM HrEmployee WHERE EmployeeId = ? AND country = ?",
-                         [employee_id, country]) if employee_id else None,
+        'employee': _one("SELECT * FROM HrEmployee WHERE EmployeeId = %s AND CountryId = %s",
+                         [employee_id, country_id]) if employee_id else None,
         'employee_id': employee_id,
     }
 
@@ -293,7 +295,6 @@ def _suggestions(score_result, condition):
     return tips[:5]
 
 
-# LLM narrative local; does not touch the old ollama_service
 def _ai_narrative(score_result, condition, amount):
     weak = [f"- {d['parameter']}: {d['score']}/5 ({d['reason']})"
             for d in score_result['client_scoring']['details'] if d['score'] <= 2]
@@ -310,75 +311,77 @@ Weak areas:
 
 In 4-6 sentences: assess the member's condition, justify the decision and the
 suggested amount, and give 2-3 concrete suggestions to reduce risk."""
-    try:
-        resp = requests.post(
-            f"{OLLAMA_BASE_URL}/api/generate",
-            json={'model': ANALYSIS_MODEL, 'prompt': prompt, 'stream': False,
-                  'keep_alive': OLLAMA_KEEP_ALIVE,
-                  'options': {'temperature': 0.5, 'num_predict': 400}},
-            timeout=120)
-        resp.raise_for_status()
-        return resp.json().get('response', '').strip()
-    except requests.exceptions.RequestException:
-        # Deterministic fallback if the model is unavailable.
-        return (f"{score_result['member_name']} is {score_result['classification']} "
-                f"({score_result['percentage']}%). {condition['summary']} "
-                f"Decision: {_decision(score_result['classification'])}. "
-                f"Suggested amount: {amount['recommended_amount']:,.0f}.")
+
+    result = llm.generate(prompt, model=ANALYSIS_MODEL, temperature=0.5, num_predict=400)
+    if result['success'] and result['text']:
+        return result['text'].strip()
+    # Deterministic fallback if the model is unavailable.
+    return (f"{score_result['member_name']} is {score_result['classification']} "
+            f"({score_result['percentage']}%). {condition['summary']} "
+            f"Decision: {_decision(score_result['classification'])}. "
+            f"Suggested amount: {amount['recommended_amount']:,.0f}.")
 
 
 # public entry point
 def analyze_member(query, country=None):
-    con = _open()
+    ref = extract_member_ref(query)
+    matches = resolve_member(ref, country)
+    if not matches:
+        return {'success': False, 'mode': 'member_analysis',
+                'error': f'No member found matching "{ref or query}".',
+                'suggestions': suggest_members(query, country),
+                'bad_request': True}
+
+    member = matches[0]
     try:
-        ref = extract_member_ref(query)
-        matches = resolve_member(con, ref, country)
-        if not matches:
-            return {'success': False, 'mode': 'member_analysis',
-                    'error': f'No member found matching "{ref or query}".',
-                    'suggestions': suggest_members(con, query, country)}
+        data = build_scoring_data(member)
+        score_result = calculate_credit_score(data)
+    except Exception as e:
+        return {'success': False, 'mode': 'member_analysis',
+                'error': f'Could not score this member: {e}'}
 
-        member = matches[0]
-        try:
-            data = build_scoring_data(con, member)
-            score_result = calculate_credit_score(data)
-        except Exception as e:
-            return {'success': False, 'mode': 'member_analysis',
-                    'error': f'Could not score this member: {e}'}
-        condition = assess_condition(data)
-        amount = recommend_loan_amount(data, score_result)
-        decision = _decision(score_result['classification'])
-        suggestions = _suggestions(score_result, condition)
-        analysis = _ai_narrative(score_result, condition, amount)
+    condition = assess_condition(data)
+    amount = recommend_loan_amount(data, score_result)
+    decision = _decision(score_result['classification'])
+    suggestions = _suggestions(score_result, condition)
+    analysis = _ai_narrative(score_result, condition, amount)
 
-        others = [f"{m.get('FirstName','')} {m.get('LastName','')} "
-                  f"({m.get('MemberCode','')}, {m.get('country','')})".strip()
-                  for m in matches[1:5]]
+    others = [f"{m.get('FirstName','')} {m.get('LastName','')} "
+              f"({m.get('MemberCode','')}, {m.get('CountryCode','')})".strip()
+              for m in matches[1:5]]
 
-        return {
-            'success': True,
-            'mode': 'member_analysis',
-            'member': {
-                'name': score_result['member_name'],
-                'code': score_result['member_code'],
-                'id': score_result['member_id'],
-                'country': member.get('country'),
-                'group': (data.get('group') or {}).get('GroupName', 'N/A'),
-                'branch': (data.get('branch') or {}).get('BranchName', 'N/A'),
-                'loan_officer': (data.get('employee') or {}).get('EmployeeName', 'N/A'),
-            },
-            'score': score_result['percentage'],
-            'classification': score_result['classification'],
-            'risk_level': score_result['risk_level'],
-            'decision': decision,
-            'condition_summary': condition['summary'],
-            'condition': condition,
-            'recommended_loan_amount': amount['recommended_amount'],
-            'amount_reasoning': amount['amount_reasoning'],
-            'suggestions': suggestions,
-            'analysis': analysis,
-            'score_detail': score_result['client_scoring'],
-            'other_matches': others,
-        }
-    finally:
-        con.close()
+    # The same code exists in more than one country — say so, rather than let the
+    # reader assume the assessment is about the person they had in mind.
+    countries = {m.get('CountryCode') for m in matches}
+    ambiguous = len(countries) > 1
+
+    return {
+        'success': True,
+        'mode': 'member_analysis',
+        'member': {
+            'name': score_result['member_name'],
+            'code': score_result['member_code'],
+            'id': score_result['member_id'],
+            'country': member.get('CountryCode'),
+            'group': (data.get('group') or {}).get('GroupName', 'N/A'),
+            'branch': (data.get('branch') or {}).get('BranchName', 'N/A'),
+            'loan_officer': (data.get('employee') or {}).get('EmployeeName', 'N/A'),
+        },
+        'score': score_result['percentage'],
+        'classification': score_result['classification'],
+        'risk_level': score_result['risk_level'],
+        'decision': decision,
+        'condition_summary': condition['summary'],
+        'condition': condition,
+        'recommended_loan_amount': amount['recommended_amount'],
+        'amount_reasoning': amount['amount_reasoning'],
+        'suggestions': suggestions,
+        'analysis': analysis,
+        'score_detail': score_result['client_scoring'],
+        'other_matches': others,
+        'ambiguous_match': ambiguous,
+        'match_note': (
+            f"This code also exists in {', '.join(sorted(countries - {member.get('CountryCode')}))}. "
+            f"Assessed the {member.get('CountryCode')} record — set a country to be explicit."
+        ) if ambiguous else None,
+    }

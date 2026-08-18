@@ -1,11 +1,14 @@
 """
-ask_ai — Local natural-language Q&A over the 4-country microfinance warehouse.
+ask_ai — Natural-language Q&A over the DW data warehouse.
 
-Self-contained module:
-  - sync_warehouse.py : pull 4 country MSSQL DBs -> local DuckDB copy
-  - engine.py         : question -> SQL (local Ollama) -> run on DuckDB -> answer
-  - api.py            : Flask blueprint `POST /api/ask-ai`
+DW is a single MSSQL catalog holding all 4 countries (UG/KY/ZM/TZ); every table
+carries CountryId + CountryCode, so one connection answers both single-country
+and cross-country questions.
 
-Nothing here touches the live MSSQL servers except the sync step, so answering a
-question is fast and works offline against the local warehouse.
+  - db.py     : pooled MSSQL access, dry-run validation, guarded execution
+  - prompt.py : question -> prompt (cached schema + glossary + few-shot)
+  - engine.py : question -> SQL (local Ollama) -> DW -> answer
+  - api.py    : Flask blueprint `POST /api/ask-ai`
+
+The model only ever writes SQL — every number in an answer comes from DW.
 """
