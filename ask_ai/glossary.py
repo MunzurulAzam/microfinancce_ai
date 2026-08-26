@@ -4,7 +4,6 @@ import re
 
 from ask_ai.config import TABLE_ALLOWLIST
 
-# Map spoken country names to the code stored in every DW table.
 COUNTRY_CODES = {
     'uganda':   'UG',
     'kenya':    'KY',
@@ -163,9 +162,6 @@ ACCOUNTING / GL
 GLOSSARY = _GLOSSARY_TEMPLATE.strip().format(JOIN_RULES=JOIN_RULES)
 
 
-# Metric definitions the model should paste in verbatim rather than re-derive.
-# Each is a CTE over the raw tables; they are the aggregates the old local
-# warehouse used to materialise.
 METRIC_CTES = """
 REUSABLE BUILDING BLOCKS — copy these verbatim when the question needs them.
 
@@ -219,9 +215,7 @@ WITH ScheduleMonthly AS (
 """.strip()
 
 
-# Verified question -> SQL examples (few-shot). Every one of these is executed
-# against DW by tests/check_examples.py — an example that does not run is a
-# prompt teaching the model to be wrong.
+# check_examples.py runs every one of these — a broken example teaches the model to be wrong.
 EXAMPLES = [
     (
         "How many active members are there in Tanzania?",
@@ -428,8 +422,6 @@ EXAMPLES = [
 ]
 
 
-# Which tables each example touches, derived from the example's own SQL so the
-# tags can never drift out of sync with it.
 def _tables_used(sql):
     return frozenset(t for t in TABLE_ALLOWLIST
                      if re.search(rf'\b{t}\b', sql))
@@ -437,18 +429,10 @@ def _tables_used(sql):
 
 _EXAMPLE_TABLES = [_tables_used(sql) for _, sql in EXAMPLES]
 
-# The first two examples are the country/portfolio basics — they teach the
-# CountryCode and LoanStatus rules, so they are always worth their tokens.
 _ANCHOR_EXAMPLES = 2
 
 
 def examples_text(tables=None, limit=8):
-    """Render the few-shot examples as a prompt block.
-
-    Sending all 20 costs ~7k characters on every question — a third of the
-    prompt, and generation time scales with it. When the caller knows which
-    tables are in play, keep only the examples that use them.
-    """
     if not tables:
         chosen = range(len(EXAMPLES))
     else:
@@ -456,8 +440,7 @@ def examples_text(tables=None, limit=8):
         chosen = [i for i, used in enumerate(_EXAMPLE_TABLES)
                   if i < _ANCHOR_EXAMPLES or (used & wanted)]
         if len(chosen) > limit:
-            # Drop the least relevant first, but never reorder: few-shot
-            # examples read better in a stable, simple-to-complex order.
+            # Drop the least relevant first, but never reorder.
             ranked = sorted(
                 chosen[_ANCHOR_EXAMPLES:],
                 key=lambda i: len(_EXAMPLE_TABLES[i] & wanted),

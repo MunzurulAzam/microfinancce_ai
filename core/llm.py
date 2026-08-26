@@ -1,14 +1,8 @@
-"""
-AI Model handler for Llama integration
-Handles model loading, prompting, and fallback analysis
-"""
-
 import os
 from config import Config
 
 
 class LlamaHandler:
-    """Manages Llama AI model for analysis"""
     
     def __init__(self):
         self.llm = None
@@ -18,9 +12,7 @@ class LlamaHandler:
             self._load_model()
     
     def _load_model(self):
-        """Load Llama model if available"""
         try:
-            # Check if model exists
             if not os.path.exists(Config.MODEL_PATH):
                 print(f"⚠️  Model not found at {Config.MODEL_PATH}")
                 print(f"📥 Please download the model from:")
@@ -53,16 +45,12 @@ class LlamaHandler:
             self.model_loaded = False
     
     def analyze_with_ai(self, prompt, context):
-        """
-        Analyze using AI model or fallback to rule-based analysis
-        """
         if self.model_loaded and self.llm:
             return self._ai_analysis(prompt, context)
         else:
             return self._fallback_analysis(prompt, context)
             
     def get_intent_ai(self, question):
-        """Use AI to classify the user intent"""
         if not self.model_loaded or not self.llm:
             return None
             
@@ -94,7 +82,6 @@ Question: """
             return None
     
     def _ai_analysis(self, prompt, context):
-        """Use Llama model for analysis"""
         full_prompt = f"""
 You are a friendly microfinance analyst assistant. You're helping a loan officer understand their portfolio.
 
@@ -126,9 +113,7 @@ Answer in a natural, conversational tone:
             return self._fallback_analysis(prompt, context)
     
     def _fallback_analysis(self, prompt, context):
-        """Rule-based analysis without AI model"""
         
-        # Extract key info from context
         if "CLIENT ANALYSIS" in context:
             return self._fallback_client_analysis(context)
         elif "GROUP ANALYSIS" in context:
@@ -137,10 +122,8 @@ Answer in a natural, conversational tone:
             return "Analysis data processed successfully. Key metrics available in the response."
     
     def _fallback_client_analysis(self, context):
-        """Generate client analysis without AI"""
         analysis = []
         
-        # Parse context for key metrics
         if "Performance Score:" in context:
             score_line = [line for line in context.split('\n') if 'Performance Score:' in line][0]
             score = int(score_line.split(':')[1].strip().split('/')[0])
@@ -183,7 +166,6 @@ Answer in a natural, conversational tone:
         return "\n".join(analysis)
     
     def _fallback_group_analysis(self, context):
-        """Generate group analysis without AI"""
         analysis = []
         
         if "Average Member Score:" in context:
@@ -226,5 +208,4 @@ Answer in a natural, conversational tone:
         return "\n".join(analysis)
 
 
-# Global instance
 llama_handler = LlamaHandler()

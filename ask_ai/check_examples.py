@@ -1,16 +1,4 @@
-"""
-Self-check for ask_ai. Two things, neither of which needs the LLM:
 
-  1. every few-shot example in glossary.py still executes against DW — an
-     example that does not run is a prompt actively teaching the model to be
-     wrong, so this gates any change to EXAMPLES;
-  2. questions route to the right pipeline — aggregate questions must reach
-     text-to-SQL, not single-member credit analysis;
-  3. the country guard recognises every correct way to scope a query, and still
-     blocks one aimed at a different country.
-
-    python -m ask_ai.check_examples
-"""
 import sys
 import time
 
@@ -25,7 +13,6 @@ from ask_ai.sql_guard import (                   # noqa: E402
     has_country_filter, sanitize, UnsafeSQL,
 )
 
-# True = single-member credit analysis, False = text-to-SQL.
 ROUTING_CASES = [
     ('give me Nyangusu this branch total member name', False),
     ('give me all member list', False),
@@ -40,8 +27,6 @@ ROUTING_CASES = [
 ]
 
 
-# (sql, is_scoped_to_KY). All of these are correct Kenya SQL except the last
-# two, which carry no country predicate at all.
 COUNTRY_CASES = [
     ("SELECT COUNT(*) FROM MfMember WHERE CountryCode = 'KY'", True),
     ("SELECT COUNT(*) FROM MfMember m WHERE m.CountryCode = 'KY'", True),
@@ -55,9 +40,7 @@ COUNTRY_CASES = [
 
 
 def check_country_guard():
-    """Correct Kenya SQL must never be rejected just for spelling the filter
-    differently — that is what broke "give me Nyangusu this branch total member
-    name". A query aimed at another country must still be refused."""
+    """Correct SQL must not be rejected for spelling the country filter differently."""
     failures = []
     for sql, scoped in COUNTRY_CASES:
         try:
@@ -70,8 +53,6 @@ def check_country_guard():
             failures.append(sql)
             print(f"FAIL country  has_country_filter should be {scoped}: {sql}")
 
-    # Aimed at another country: must be refused, and must say which one. The
-    # IN (...) case matters too — it would quietly widen a KY answer to ZM.
     for sql, other in [
         ("SELECT COUNT(*) FROM MfMember WHERE CountryCode = 'UG'", 'UG'),
         ("SELECT COUNT(*) FROM MfMember WHERE CountryId = 3", 'UG'),
@@ -134,7 +115,6 @@ def main():
 
     print(f"\n{len(EXAMPLES) - len(failures)}/{len(EXAMPLES)} examples valid")
     if empty:
-        # Not fatal — but an example returning nothing teaches nothing.
         print(f"{len(empty)} returned no rows: {', '.join(empty)}")
 
     routing_failures = check_routing()

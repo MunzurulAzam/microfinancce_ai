@@ -1,11 +1,4 @@
-"""
-Ollama client for ask_ai.
 
-Talks to the local Ollama daemon (OLLAMA_BASE_URL) via /api/generate. Follows
-the same contract as document_verification/vision_client.py: never raises,
-always returns {'success', 'text', 'error'}, and error strings name the exact
-command that fixes the problem.
-"""
 import time
 
 import requests
@@ -19,8 +12,7 @@ _RETRY_BACKOFF_SEC = 4
 
 
 def generate(prompt, *, model=None, temperature=0.0, num_predict=400, timeout=120):
-    """One /api/generate call. Returns {'success': bool, 'text': str|None,
-    'error': str|None}, plus 'unavailable' when the daemon or model is missing."""
+
     model = model or ASK_AI_MODEL
     payload = {
         'model': model,
@@ -80,8 +72,7 @@ def _cloud_hint(model):
 
 
 def summarize(question, columns, rows, *, timeout=60):
-    """One-line natural-language phrasing of a result set. Returns the sentence,
-    or None — the data is still worth returning when phrasing fails."""
+    """ natural-language phrasing of a result set."""
     result = generate(
         "Answer the user's question in ONE short sentence using the data.\n"
         "Use the numbers exactly as given; do not recalculate or round them.\n"

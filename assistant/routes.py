@@ -1,8 +1,3 @@
-"""
-Conversational Ask endpoint
-Intelligent question answering system
-"""
-
 from flask import Blueprint, request, jsonify
 from portfolio.data_service import (
     get_basic_stats,
@@ -23,13 +18,9 @@ ask_bp = Blueprint('ask', __name__)
 
 
 def parse_question(question):
-    """
-    Parse user question and determine intent
-    Returns: (intent, entity)
-    """
+    """Returns (intent, entity) for a user question."""
     question_lower = question.lower().strip()
-    
-    # 0. Credit Score intent (highest priority)
+
     credit_patterns = [
         r'credit\s*scor(?:e|ing)\s+(?:for\s+)?(.+)',
         r'score\s+(?:for\s+)?(?:client\s+)?(.+)',
@@ -44,34 +35,24 @@ def parse_question(question):
             entity = match.group(1).strip().rstrip('?.!')
             if entity and len(entity) > 1:
                 return ('credit_score', entity)
-    
-    # 1. Direct Keyword Matching (Fast)
-    
-    # Stats intent
+
     if any(k in question_lower for k in ['stats', 'statistics', 'overview', 'summary', 'total', 'how many']):
         return ('stats', None)
-    
-    # Insights intent
+
     if any(k in question_lower for k in ['insight', 'dashboard', 'overall performance', 'how are we doing']):
         return ('insights', None)
-    
-    # Top performers intent
+
     if any(k in question_lower for k in ['top', 'best', 'highest', 'performing', 'winner']):
         if 'group' in question_lower:
             return ('top_groups', None)
         return ('top_clients', None)
-    
-    # Risk patterns
+
     if any(k in question_lower for k in ['risk', 'overdue', 'problem', 'issue', 'default', 'high risk', 'danger']):
         return ('risk_analysis', None)
-    
-    # Business patterns
+
     if any(k in question_lower for k in ['business', 'sector', 'industry', 'loan purpose']):
         return ('business_performance', None)
 
-    # 2. Regex for Entities (Client/Group)
-    
-    # Group analysis patterns
     group_patterns = [
         r'group\s+(.+)',
         r'about\s+group\s+(.+)',
@@ -81,7 +62,6 @@ def parse_question(question):
         match = re.search(p, question_lower)
         if match: return ('analyze_group', match.group(1).strip())
 
-    # Client analysis patterns
     client_patterns = [
         r'client\s+(.+)',
         r'customer\s+(.+)',
@@ -93,19 +73,14 @@ def parse_question(question):
         match = re.search(p, question_lower)
         if match:
             name = match.group(1).strip()
-            # Clean name from stop words
             name = re.sub(r'(\?|\.|\!|doing|performing|is|the)$', '', name).strip()
             if name and len(name) > 2:
                 return ('analyze_client', name)
 
-    # 3. AI Fallback (If rules fail)
     return ('general', None)
 
 
 def get_answer(intent, entity, question):
-    """
-    Get answer based on intent and entity
-    """
     try:
         if intent == 'credit_score':
             return _handle_credit_score(entity)
@@ -116,11 +91,10 @@ def get_answer(intent, entity, question):
                     'success': False,
                     'answer': 'Please provide the client name. Example: "Analyze client John Doe"'
                 }
-            
+
             result = analyze_client(entity)
 
             if not result['success']:
-                # Suggest similar clients from MSSQL
                 suggestions_list = get_all_clients(limit=5, search=entity[:3])
                 suggestions = [c['name'] for c in suggestions_list]
 
@@ -129,8 +103,7 @@ def get_answer(intent, entity, question):
                     'answer': f'Client "{entity}" not found.',
                     'suggestions': suggestions
                 }
-            
-            # Format response
+
             client = result['client_info']
             answer = f"""
 📊 **Analysis for {client['name']}:**
@@ -145,24 +118,23 @@ def get_answer(intent, entity, question):
 **AI Analysis:**
 {result['ai_analysis']}
 """
-            
+
             return {
                 'success': True,
                 'answer': answer.strip(),
                 'data': result
             }
-        
+
         elif intent == 'analyze_group':
             if not entity:
                 return {
                     'success': False,
                     'answer': 'Please provide the group name. Example: "Analyze group Team A"'
                 }
-            
+
             result = analyze_group(entity)
 
             if not result['success']:
-                # Suggest similar groups from MSSQL
                 suggestions_list = get_all_groups(limit=5, search=entity[:3])
                 suggestions = [g['name'] for g in suggestions_list]
 
@@ -171,12 +143,11 @@ def get_answer(intent, entity, question):
                     'answer': f'Group "{entity}" not found.',
                     'suggestions': suggestions
                 }
-            
-            # Format response
+
             group = result['group_info']
             members_list = '\n'.join([f"  - {m['name']}: {m['score']}/100" 
                                      for m in result['top_members'][:3]])
-            
+
             answer = f"""
 👥 **Analysis for {group['name']}:**
 
@@ -192,13 +163,13 @@ def get_answer(intent, entity, question):
 **AI Analysis:**
 {result['ai_analysis']}
 """
-            
+
             return {
                 'success': True,
                 'answer': answer.strip(),
                 'data': result
             }
-        
+
         elif intent == 'stats':
             stats = get_basic_stats()
 
@@ -225,7 +196,7 @@ def get_answer(intent, entity, question):
                 'answer': answer.strip(),
                 'data': stats
             }
-        
+
         elif intent == 'insights':
             insights = get_quick_insights()
 
@@ -260,7 +231,7 @@ def get_answer(intent, entity, question):
                 'answer': answer.strip(),
                 'data': insights
             }
-        
+
         elif intent == 'top_clients':
             top_clients = get_top_performers(limit=10, performance_type='clients')
 
@@ -278,25 +249,25 @@ def get_answer(intent, entity, question):
                 'answer': answer.strip(),
                 'data': top_clients
             }
-        
+
         elif intent == 'top_groups':
             top_groups = get_top_performers(limit=10, performance_type='groups')
-            
+
             groups_list = '\n'.join([f"  {i+1}. {g['group_name']}: {g['avg_score']:.1f}/100 ({g['member_count']} members)" 
                                     for i, g in enumerate(top_groups)])
-            
+
             answer = f"""
 🏆 **Top 10 Performing Groups:**
 
 {groups_list}
 """
-            
+
             return {
                 'success': True,
                 'answer': answer.strip(),
                 'data': top_groups
             }
-        
+
         elif intent == 'risk_analysis':
             risk = get_risk_analysis(overdue_threshold=3)
 
@@ -321,27 +292,26 @@ def get_answer(intent, entity, question):
                 'answer': answer.strip(),
                 'data': risk
             }
-        
+
         elif intent == 'business_performance':
             business = get_business_performance()
-            
+
             business_list = '\n'.join([f"  {i+1}. {b['business_type']}: {b['avg_score']:.1f}/100 ({b['client_count']} clients)" 
                                       for i, b in enumerate(business[:10])])
-            
+
             answer = f"""
 💼 **Business Performance Analysis:**
 
 {business_list}
 """
-            
+
             return {
                 'success': True,
                 'answer': answer.strip(),
                 'data': business
             }
-        
+
         else:
-            # General response
             return {
                 'success': True,
                 'answer': """
@@ -359,7 +329,7 @@ I can help you with the following:
 What would you like to know?
 """.strip()
             }
-    
+
     except Exception as e:
         return {
             'success': False,
@@ -368,10 +338,7 @@ What would you like to know?
 
 
 def _handle_credit_score(entity):
-    """
-    Handle credit scoring request.
-    Fetches data from MSSQL DB, calculates score, gets AI analysis.
-    """
+    """Fetch member data from MSSQL, score it, and attach the AI analysis."""
     if not entity:
         return {
             'success': False,
@@ -380,7 +347,6 @@ def _handle_credit_score(entity):
         }
 
     try:
-        # Step 1: Search for the member
         members = search_member(entity)
 
         if not members:
@@ -390,11 +356,9 @@ def _handle_credit_score(entity):
                           f'Try using full name, Member ID, or Member Code (e.g. CLN0025881).'
             }
 
-        # Use first match (best match)
         member = members[0]
         member_id = member['MemberId']
 
-        # Step 2: Fetch full data
         full_data = get_member_full_data(member_id)
         if not full_data:
             return {
@@ -402,17 +366,13 @@ def _handle_credit_score(entity):
                 'answer': f'❌ Could not fetch full data for member ID {member_id}.'
             }
 
-        # Step 3: Calculate credit score
         score_result = calculate_credit_score(full_data)
 
-        # Step 4: Get AI analysis
         ai_analysis = get_ai_analysis(score_result)
         score_result['ai_analysis'] = ai_analysis
 
-        # Step 5: Format text response
         answer = _format_credit_score_text(score_result)
 
-        # If multiple matches, note it
         if len(members) > 1:
             others = [f"{m['FirstName']} {m['LastName']} ({m['MemberCode']})" for m in members[1:5]]
             answer += f"\n\n📋 Other matches: {', '.join(others)}"
@@ -432,11 +392,6 @@ def _handle_credit_score(entity):
 
 
 def _format_credit_score_text(sr):
-    """Format credit score result as readable text for the chat.
-    Currently shows Client Scoring only.
-    Branch and LO sections are commented out below for future use.
-    """
-    # Classification emoji
     cls_emoji = {
         'Excellent': '🟢',
         'Good': '🔵',
@@ -456,26 +411,9 @@ def _format_credit_score_text(sr):
         f"📋 **Client Scoring:** {sr['client_scoring']['score']}/{sr['client_scoring']['max']} ({sr['client_scoring']['percentage']}%)",
     ]
 
-    # Show client parameter details
     for d in sr['client_scoring']['details']:
         bar = '█' * d['score'] + '░' * (5 - d['score'])
         lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
-
-    # ── Branch Performance section (disabled — Client-Only Mode) ──────────────
-    # Uncomment below when branch scoring is re-enabled in credit_scoring.py
-    # lines.append(f"")
-    # lines.append(f"🏢 **Branch Performance:** {sr['branch_scoring']['score']}/{sr['branch_scoring']['max']} ({sr['branch_scoring']['percentage']}%) — {sr['branch_scoring']['branch_name']}")
-    # for d in sr['branch_scoring']['details']:
-    #     bar = '█' * d['score'] + '░' * (5 - d['score'])
-    #     lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
-
-    # ── Loan Officer section (disabled — Client-Only Mode) ────────────────────
-    # Uncomment below when LO scoring is re-enabled in credit_scoring.py
-    # lines.append(f"")
-    # lines.append(f"👤 **Loan Officer:** {sr['lo_scoring']['score']}/{sr['lo_scoring']['max']} ({sr['lo_scoring']['percentage']}%) — {sr['lo_scoring']['lo_name']}")
-    # for d in sr['lo_scoring']['details']:
-    #     bar = '█' * d['score'] + '░' * (5 - d['score'])
-    #     lines.append(f"  {bar} {d['score']}/5 — {d['parameter']}: {d['reason']}")
 
     lines.append(f"")
     lines.append(f"{'─' * 40}")
@@ -487,44 +425,35 @@ def _format_credit_score_text(sr):
 
 @ask_bp.route('/ask', methods=['POST'])
 def ask_endpoint():
-    """
-    Single endpoint for all questions
-    
-    Request body: {"question": "Your question here"}
-    Response: Natural language answer
-    """
+    """POST /api/ask — {"question": str} in, natural-language answer out."""
     try:
         data = request.get_json()
-        
+
         if not data or 'question' not in data:
             return jsonify({
                 'success': False,
                 'answer': 'Please provide the "question" field.',
                 'example': {'question': 'Show me statistics'}
             }), 400
-        
+
         question = data['question']
-        
-        # Parse question using rules first
+
         intent, entity = parse_question(question)
-        
-        # If rules return general, try AI intent classification
+
         if intent == 'general':
             from core.llm import llama_handler
             ai_intent = llama_handler.get_intent_ai(question)
             if ai_intent:
                 intent = ai_intent
-        
-        # Get answer
+
         response = get_answer(intent, entity, question)
-        
-        # Add metadata
+
         response['intent'] = intent
         if entity:
             response['entity'] = entity
-        
+
         return jsonify(response), 200
-        
+
     except Exception as e:
         return jsonify({
             'success': False,

@@ -1,9 +1,3 @@
-"""
-Main Flask Application
-Microfinance AI Analysis API
-"""
-
-# Load .env for local development (no-op on Render where env vars are set natively)
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -18,26 +12,21 @@ from ask_ai.api import ask_ai_bp
 
 
 def create_app(config_class=Config):
-    """Create and configure Flask application"""
     
     app = Flask(__name__)
     app.config.from_object(config_class)
     
-    # Initialize config
     config_class.init_app(app)
 
-    # CORS
     allowed_origins = config_class.CORS_ORIGINS
     print(f"CORS ALLOWED ORIGINS: {allowed_origins}")
 
     @app.after_request
     def add_cors_headers(response):
         origin = request.headers.get('Origin', '')
-        # If the request origin is in our whitelist, echo it back
         if origin in allowed_origins or '*' in allowed_origins:
             response.headers['Access-Control-Allow-Origin'] = origin
         else:
-            # Fallback: allow all (safe for public APIs with no credentials)
             response.headers['Access-Control-Allow-Origin'] = '*'
 
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
@@ -45,31 +34,26 @@ def create_app(config_class=Config):
         response.headers['Access-Control-Max-Age'] = '3600'
         return response
 
-    # Handle preflight OPTIONS requests explicitly
     @app.before_request
     def handle_preflight():
         if request.method == 'OPTIONS':
             response = app.make_default_options_response()
             return response
     
-    # Auto-load data if available
     from portfolio.csv_store import data_processor
     data_processor.auto_load()
     
-    # Register blueprints
     app.register_blueprint(data_bp, url_prefix='/api')
     app.register_blueprint(analysis_bp, url_prefix='/api/analyze')
-    app.register_blueprint(ask_bp, url_prefix='/api')  # Conversational endpoint
+    app.register_blueprint(ask_bp, url_prefix='/api')
     app.register_blueprint(evaluation_bp, url_prefix='/api')
     app.register_blueprint(doc_verify_bp, url_prefix='/api')
     app.register_blueprint(nid_scanner_bp, url_prefix='/api')
-    app.register_blueprint(ask_ai_bp, url_prefix='/api')  # DW warehouse Q&A (text-to-SQL)
+    app.register_blueprint(ask_ai_bp, url_prefix='/api')
 
-    # Cache the DW schema up front so the first question does not pay for it.
     from ask_ai import schema as ask_ai_schema
     ask_ai_schema.warm()
     
-    # Root endpoint
     @app.route('/')
     def index():
         return jsonify({
@@ -105,7 +89,6 @@ def create_app(config_class=Config):
             'documentation': 'See README.md for detailed API documentation'
         })
     
-    # Health check endpoint
     @app.route('/health')
     def health():
         return jsonify({
@@ -113,7 +96,6 @@ def create_app(config_class=Config):
             'service': 'Microfinance AI API'
         })
     
-    # Error handlers
     @app.errorhandler(404)
     def not_found(error):
         return jsonify({

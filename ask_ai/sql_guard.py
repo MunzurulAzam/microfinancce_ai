@@ -1,9 +1,4 @@
-"""
-Turn raw model output into a single SQL statement that is safe to run on DW.
-
-The DW login has write and DDL rights, so this is the first of four layers:
-guard (here) -> dry-run validation -> rollback-wrapped execution -> row cap.
-"""
+"""Turn raw model output into a single SQL statement that is safe to run on DW."""
 import re
 
 from ask_ai.config import MAX_RESULT_ROWS, COUNTRY_CODES
@@ -17,8 +12,7 @@ _FORBIDDEN = re.compile(
 
 _FENCE = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL | re.IGNORECASE)
 
-# 'string literals' and [bracketed names] may legally contain words like Set or
-# Delete; block comments and -- comments may hide a second statement.
+# Literals and [bracketed names] may contain Set/Delete; comments may hide a second statement.
 _LITERAL = re.compile(r"'(?:[^']|'')*'|\[[^\]]*\]")
 _LINE_COMMENT = re.compile(r'--[^\n]*')
 _BLOCK_COMMENT = re.compile(r'/\*.*?\*/', re.DOTALL)
@@ -28,12 +22,7 @@ _HAS_TOP = re.compile(r'^\s*select\s+(distinct\s+)?top\s*[\s(]', re.IGNORECASE)
 
 
 class UnsafeSQL(ValueError):
-    """The model produced something we will not send to the warehouse.
-
-    `fixable` marks the cases worth one repair attempt (the model aimed at the
-    wrong country). Write/DDL and multi-statement output is never fixable —
-    retrying that is pointless, and refusing it is the whole point of the guard.
-    """
+    """The model produced something we will not send to the warehouse."""
 
     def __init__(self, message, fixable=False):
         super().__init__(message)
@@ -51,23 +40,18 @@ def _strip_comments(sql):
 
 
 def _strip_noise(sql):
-    """Comments *and* literal text blanked out. Keyword checks run against this
-    so that a legitimate `WHERE Status = 'Deleted'` is not mistaken for a DELETE."""
+    """Comments *and* literal text blanked out."""
     return _LITERAL.sub(_blank, _strip_comments(sql))
 
 
 def sanitize(raw, country=None):
-    """Clean model output and reject anything that is not one read-only SELECT.
-
-    Returns the SQL ready to execute. Raises UnsafeSQL otherwise.
-    """
+    """Clean model output and reject anything that is not one read-only SELECT."""
     sql = (raw or '').strip()
 
     fence = _FENCE.search(sql)
     if fence:
         sql = fence.group(1).strip()
 
-    # Some models prefix a stray label even when told not to.
     sql = re.sub(r'^\s*(sql|query)\s*:\s*', '', sql, flags=re.IGNORECASE).strip()
 
     if not sql:
@@ -75,7 +59,6 @@ def sanitize(raw, country=None):
 
     code = _strip_noise(sql)
 
-    # One statement only. A trailing semicolon is fine; anything after it is not.
     head, _, tail = code.partition(';')
     if tail.strip():
         raise UnsafeSQL('Only a single SQL statement is allowed.')
@@ -101,8 +84,7 @@ def sanitize(raw, country=None):
     if country:
         if country not in COUNTRY_CODES:
             raise UnsafeSQL(f'Unknown country "{country}".')
-        # Reporting on the WRONG country is unambiguous, so it stays fatal.
-        # A merely *absent* filter is not — see has_country_filter().
+        # The wrong country is fatal; a merely absent filter is not.
         other = conflicting_country(sql, country)
         if other:
             raise UnsafeSQL(
@@ -123,8 +105,7 @@ def _country_patterns(code, country_id):
 
 
 def _country_id(code):
-    """Numeric id for a country code, or None if DW cannot be reached — the
-    caller then simply loses the CountryId form, it does not break."""
+    """Numeric id for a country code, or None if DW is unreachable — callers degrade, not break."""
     try:
         from ask_ai import schema
         return schema.country_ids().get(code)
@@ -133,14 +114,7 @@ def _country_id(code):
 
 
 def has_country_filter(sql, country):
-    """True when the SQL scopes itself to `country`.
-
-    The country predicate lives inside a string literal, so this reads the
-    comment-stripped SQL rather than the literal-stripped `code`. It accepts
-    every equivalent form — `= 'KY'`, `= N'KY'`, `IN ('KY')`, `LIKE 'KY'`,
-    and `CountryId = 1` — because demanding one exact spelling rejected correct
-    queries.
-    """
+    """True when the SQL scopes itself to `country`."""
     if not country:
         return True
     text = _strip_comments(sql)
@@ -150,11 +124,7 @@ def has_country_filter(sql, country):
 
 
 def conflicting_country(sql, country):
-    """The code of a different country this SQL explicitly filters on, if any.
-
-    Only an explicit filter counts — a query that scopes itself some other way
-    (a branch that exists in one country only) conflicts with nothing.
-    """
+    """The code of a different country this SQL explicitly filters on, if any."""
     text = _strip_comments(sql)
     for other in COUNTRY_CODES:
         if other == country:
@@ -166,13 +136,11 @@ def conflicting_country(sql, country):
 
 
 def _cap_rows(sql, code):
-    """T-SQL has no LIMIT — inject TOP (n) so a runaway query cannot stream a
-    million rows back through Flask."""
+    """T-SQL has no LIMIT — inject TOP (n) so a runaway query cannot stream a million rows."""
     if _HAS_TOP.match(code):
         return sql
     if code.lstrip().lower().startswith('with'):
-        # TOP belongs on the CTE's final SELECT, which is not reliably locatable
-        # by regex. db.run_sql caps the rows it materialises, so this is covered.
+        # TOP on a CTE is not regex-locatable — db.run_sql caps the rows instead.
         return sql
     match = _SELECT_HEAD.match(sql)
     if not match:
@@ -181,8 +149,7 @@ def _cap_rows(sql, code):
 
 
 def strip_limit(sql):
-    """Models trained on other dialects reach for LIMIT. Rewrite a trailing
-    LIMIT n into TOP (n) rather than failing the whole generation."""
+    """Models trained on other dialects reach for LIMIT."""
     match = re.search(r'\blimit\s+(\d+)\s*;?\s*$', sql, re.IGNORECASE)
     if not match:
         return sql

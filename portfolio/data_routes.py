@@ -1,8 +1,3 @@
-"""
-Data management routes
-Handles file upload and data queries
-"""
-
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
@@ -13,21 +8,14 @@ data_bp = Blueprint('data', __name__)
 
 
 def allowed_file(filename):
-    """Check if file extension is allowed"""
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
 
 
 @data_bp.route('/upload', methods=['POST'])
 def upload_file():
-    """
-    Upload and process CSV file
-    
-    Request: multipart/form-data with 'file' field
-    Response: Success status and data summary
-    """
+    """POST — multipart 'file' (CSV/Excel), returns a summary of what was loaded."""
     try:
-        # Check if file is in request
         if 'file' not in request.files:
             return jsonify({
                 'success': False,
@@ -36,26 +24,22 @@ def upload_file():
         
         file = request.files['file']
         
-        # Check if file is selected
         if file.filename == '':
             return jsonify({
                 'success': False,
                 'error': 'No file selected'
             }), 400
         
-        # Check file type
         if not allowed_file(file.filename):
             return jsonify({
                 'success': False,
                 'error': 'Invalid file type. Only CSV files allowed.'
             }), 400
         
-        # Save file
         filename = secure_filename(file.filename)
         filepath = os.path.join(Config.UPLOAD_FOLDER, filename)
         file.save(filepath)
         
-        # Load and process data
         success, message = data_processor.load_data(filepath)
         
         if not success:
@@ -64,7 +48,6 @@ def upload_file():
                 'error': message
             }), 500
         
-        # Get basic stats
         stats = data_processor.get_basic_stats()
         
         return jsonify({
@@ -82,9 +65,6 @@ def upload_file():
 
 @data_bp.route('/stats', methods=['GET'])
 def get_stats():
-    """
-    Get basic statistics from MSSQL database.
-    """
     try:
         stats = get_basic_stats()
 
@@ -108,9 +88,6 @@ def get_stats():
 
 @data_bp.route('/clients', methods=['GET'])
 def get_clients():
-    """
-    Get client list from MSSQL.
-    """
     try:
         limit = int(request.args.get('limit', 100))
         offset = int(request.args.get('offset', 0))
@@ -133,9 +110,6 @@ def get_clients():
 
 @data_bp.route('/groups', methods=['GET'])
 def get_groups():
-    """
-    Get group list from MSSQL.
-    """
     try:
         limit = int(request.args.get('limit', 100))
         offset = int(request.args.get('offset', 0))

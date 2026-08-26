@@ -12,12 +12,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 
 def _sanitize(obj):
-    """
-    Recursively walk a dict/list and replace any float Infinity or NaN
-    with 0.0 so that Flask's jsonify produces valid JSON.
-    (JavaScript's JSON.parse rejects Infinity/NaN and throws an error,
-    which makes the frontend report 'Failed to connect to the server'.)
-    """
+    """Recursively walk a dict/list and replace any float Infinity or NaN with 0.0 so that Flask's jsonify produces valid JSON."""
     if isinstance(obj, dict):
         return {k: _sanitize(v) for k, v in obj.items()}
     if isinstance(obj, list):
@@ -29,23 +24,13 @@ def _sanitize(obj):
 
 @evaluation_bp.route('/evaluate', methods=['POST'])
 def evaluate_applicant():
-    """
-    Evaluate a loan applicant using any bank or M-Pesa statement PDF.
-
-    Accepts statements from any country / bank (1–6 months).
-    Auto-detects format, currency, and bank name.
-    Normalises all figures to monthly averages before comparing
-    against the applicant's self-declared monthly income.
-    """
     try:
-        # ── Section A: Manual form fields ─────────────────────────────────
         applicant_name      = request.form.get('applicantName', 'Unknown')
         business_type       = request.form.get('businessType', 'General')
         business_age        = float(request.form.get('businessAge', 0))
         self_declared_income= float(request.form.get('monthlyIncome', 0))
         rent_amount         = float(request.form.get('rentAmount', 0))
 
-        # ── Section B: Document upload ─────────────────────────────────────
         if 'bankStatement' not in request.files:
             return jsonify({'success': False, 'error': 'No file uploaded'}), 400
 
@@ -61,7 +46,6 @@ def evaluate_applicant():
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(file_path)
 
-        # ── Section C: Parse the PDF (universal engine) ────────────────────
         try:
             m = parse_statement(file_path)
         finally:
@@ -81,9 +65,8 @@ def evaluate_applicant():
         is_mpesa            = m['is_mpesa']
         tx_summary          = m.get('transaction_summary', {})
 
-        # ── Section D: Income Validation (monthly-normalised) ──────────────
         income_match = False
-        margin = 0.20  # 20 % tolerance
+        margin = 0.20
 
         if monthly_avg_credit > 0:
             lower = (1 - margin) * monthly_avg_credit
@@ -91,11 +74,10 @@ def evaluate_applicant():
             if lower <= self_declared_income <= upper:
                 income_match = True
             elif self_declared_income <= monthly_avg_credit:
-                income_match = True   # under-declaring is acceptable
+                income_match = True
 
         status = 'Verified' if income_match else 'Needs Review'
 
-        # ── Section E: Loan Eligibility ────────────────────────────────────
         is_eligible      = False
         suggested_amount = 0.0
         eligibility_reason = ''
@@ -107,11 +89,9 @@ def evaluate_applicant():
                 eligibility_reason = 'Average monthly balance / income is too low.'
             else:
                 is_eligible = True
-                # Use the lower of self-declared income vs avg monthly credit
                 base = (monthly_avg_credit if self_declared_income <= 0
                         else min(self_declared_income, monthly_avg_credit))
 
-                # Multiplier scales with business maturity
                 if business_age < 2:
                     multiplier = 2
                 elif business_age < 5:
@@ -124,9 +104,6 @@ def evaluate_applicant():
         else:
             eligibility_reason = 'Income verification failed or needs manual review.'
 
-        # ── Section F: Build response ──────────────────────────────────────
-        # Sanitize all floats — Infinity/NaN are invalid JSON and cause
-        # the frontend to show "Failed to connect to the server"
         safe_credit      = monthly_avg_credit if math.isfinite(monthly_avg_credit) else 0.0
         safe_debit       = monthly_avg_debit  if math.isfinite(monthly_avg_debit)  else 0.0
         safe_tc          = total_credit        if math.isfinite(total_credit)        else 0.0
@@ -139,7 +116,6 @@ def evaluate_applicant():
                 'applicantName': applicant_name,
                 'businessType':  business_type,
 
-                # Statement metadata
                 'statementPeriod': {
                     'months':    period_months,
                     'startDate': period_start,
@@ -149,23 +125,19 @@ def evaluate_applicant():
                     'isMpesa':   is_mpesa,
                 },
 
-                # Raw totals for the full statement period
                 'metrics': {
                     'totalCredit':           safe_tc,
                     'totalDebit':            safe_td,
                     'averageMonthlyBalance': safe_bal,
                 },
 
-                # Monthly-normalised figures
                 'monthlyAverages': {
                     'avgMonthlyCredit': safe_credit,
                     'avgMonthlyDebit':  safe_debit,
                 },
 
-                # Transaction breakdown
                 'transactionSummary': tx_summary,
 
-                # Validation result
                 'validation': {
                     'incomeMatch': income_match,
                     'status':      status,
@@ -176,7 +148,6 @@ def evaluate_applicant():
                     ),
                 },
 
-                # Loan prediction
                 'loanPrediction': {
                     'isEligible':      is_eligible,
                     'suggestedAmount': round(suggested_amount, 2),
@@ -185,7 +156,6 @@ def evaluate_applicant():
             }
         }
 
-        # Final safety net: recursively replace any remaining Inf/NaN
         return jsonify(_sanitize(response_body))
 
     except Exception as e:

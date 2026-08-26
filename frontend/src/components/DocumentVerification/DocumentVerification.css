@@ -4,7 +4,6 @@
     padding: 2rem 1.5rem;
 }
 
-/* ── Header ──────────────────────────────────────────────────────────────── */
 .doc-verify-header {
     display: flex;
     align-items: center;
@@ -37,7 +36,6 @@
     color: var(--text-secondary);
 }
 
-/* ── Content ─────────────────────────────────────────────────────────────── */
 .doc-verify-content {
     display: flex;
     flex-direction: column;
@@ -53,7 +51,6 @@
     box-shadow: var(--shadow-md);
 }
 
-/* ── Upload zone ─────────────────────────────────────────────────────────── */
 .doc-upload-zone {
     border: 2px dashed var(--glass-border);
     border-radius: var(--radius-lg);
@@ -107,7 +104,6 @@
     color: var(--text-muted);
 }
 
-/* ── Preview ─────────────────────────────────────────────────────────────── */
 .doc-preview-wrapper {
     display: flex;
     flex-direction: column;
@@ -146,7 +142,6 @@
     color: var(--text-muted);
 }
 
-/* ── Alert ───────────────────────────────────────────────────────────────── */
 .doc-alert {
     display: flex;
     align-items: flex-start;
@@ -163,7 +158,6 @@
     color: var(--accent-danger);
 }
 
-/* ── Actions ─────────────────────────────────────────────────────────────── */
 .doc-actions {
     display: flex;
     gap: 0.75rem;
@@ -223,7 +217,6 @@
     cursor: not-allowed;
 }
 
-/* ── Result card ─────────────────────────────────────────────────────────── */
 .doc-result-card {
     display: flex;
     align-items: center;
@@ -306,7 +299,6 @@
     flex-shrink: 0;
 }
 
-/* ── Info card ───────────────────────────────────────────────────────────── */
 .doc-info-card {
     padding: 1.5rem 1.75rem;
     border-radius: var(--radius-xl);
@@ -356,7 +348,6 @@
     margin-top: 2px;
 }
 
-/* ── Spinner ─────────────────────────────────────────────────────────────── */
 .spin {
     animation: spin 1s linear infinite;
 }
@@ -366,7 +357,6 @@
     to   { transform: rotate(360deg); }
 }
 
-/* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
     .doc-verify-page {
         padding: 1.25rem 1rem;

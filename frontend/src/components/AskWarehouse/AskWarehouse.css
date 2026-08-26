@@ -7,7 +7,6 @@
     gap: 1.25rem;
 }
 
-/* ── Header ── */
 .wq-header {
     display: flex;
     align-items: flex-start;
@@ -40,7 +39,6 @@
     max-width: 60ch;
 }
 
-/* ── Form ── */
 .wq-form {
     display: flex;
     flex-direction: column;
@@ -78,7 +76,6 @@
     padding: 0 1.2rem;
 }
 
-/* ── Country chips ── */
 .wq-chips {
     display: flex;
     align-items: center;
@@ -120,7 +117,6 @@
     opacity: 0.6;
 }
 
-/* ── Examples ── */
 .wq-examples {
     display: flex;
     flex-wrap: wrap;
@@ -152,7 +148,6 @@
     border-color: var(--yellow-300);
 }
 
-/* ── Loading ── */
 .wq-loading {
     display: flex;
     align-items: center;
@@ -186,7 +181,6 @@
     30% { transform: translateY(-5px); opacity: 1; }
 }
 
-/* ── Error ── */
 .wq-error {
     display: flex;
     gap: 0.6rem;
@@ -206,7 +200,6 @@
     margin-top: 0.5rem;
 }
 
-/* ── Result ── */
 .wq-result {
     display: flex;
     flex-direction: column;
@@ -236,7 +229,6 @@
     line-height: 1.5;
 }
 
-/* ── Collapsible SQL ── */
 .wq-sql-block {
     display: flex;
     flex-direction: column;
@@ -277,7 +269,6 @@
     word-break: break-word;
 }
 
-/* ── Table ── */
 .wq-table-wrap {
     display: flex;
     flex-direction: column;
@@ -341,14 +332,12 @@
     border-radius: 14px;
 }
 
-/* ── "did you mean" suggestions in error ── */
 .wq-suggest {
     margin-top: 0.5rem;
     font-size: 0.85rem;
     color: var(--text-secondary);
 }
 
-/* ── Member analysis card ── */
 .ma-card {
     display: flex;
     flex-direction: column;

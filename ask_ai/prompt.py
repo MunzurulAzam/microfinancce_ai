@@ -5,8 +5,7 @@ import re
 from ask_ai import schema as schema_mod
 from ask_ai.glossary import GLOSSARY, JOIN_RULES, METRIC_CTES, examples_text
 
-# Only the tables a question plausibly needs are described — the full allowlist
-# is ~12k characters of DDL, which buries the question and slows generation.
+# Only plausibly-needed tables are described — the full DDL is ~12k chars.
 _CORE_TABLES = ['MfMember', 'MfLoan']
 
 _TABLE_KEYWORDS = {
@@ -27,8 +26,7 @@ _TABLE_KEYWORDS = {
     'MfLoanGrantor':          ['guarantor', 'grantor'],
     'MfMemberBusiness':       ['business', 'sector', 'industry', 'occupation', 'trade'],
     'MfMemberAdditionalInfo': ['additional info', 'extra info'],
-    # MfMember has no BranchId — MfGroup is the only bridge to a branch, so any
-    # branch question needs it in the prompt.
+    # MfMember has no BranchId — MfGroup is the only bridge to a branch.
     'MfGroup':                ['group', 'groups', 'centre', 'center',
                                'branch', 'branches'],
     'MfTrendReport':          ['trend', 'monthly', 'month', 'over time', 'per month',
@@ -54,8 +52,6 @@ _TABLE_KEYWORDS = {
     'AdDivision':             ['division'],
 }
 
-# The CTE block is long; only include it when the question is actually about
-# something it helps with.
 _CTE_KEYWORDS = ('collection', 'collected', 'overdue', 'arrear', 'par', 'repay',
                  'trend', 'expected', 'due', 'schedule', 'installment', 'instalment')
 
@@ -110,14 +106,7 @@ _BAD_COLUMN = re.compile(r"Invalid column name '([^']+)'", re.IGNORECASE)
 
 
 def _column_hint(error, tables):
-    """For "Invalid column name 'X'", name the tables that really do have X.
 
-    This is the fact the model is missing and cannot guess — without it the
-    retry just reproduces the same wrong join (MfMember.BranchId being the
-    usual one). Restricted to the tables in play, so the hint stays a short
-    pointer rather than a list of every table in the warehouse. The schema is
-    already cached, so this costs nothing.
-    """
     match = _BAD_COLUMN.search(error or '')
     if not match:
         return ''
@@ -132,9 +121,7 @@ def _column_hint(error, tables):
 
 
 def build_repair_prompt(question, sql, error, country=None):
-    """Second attempt: the model's own SQL, the server's complaint, and the
-    schema it needs to act on them. Without the schema the retry cannot fix the
-    most common failure — a column placed on the wrong table."""
+
     tables = select_tables(question)
     return (
         "The following Microsoft SQL Server query failed. Fix it.\n\n"

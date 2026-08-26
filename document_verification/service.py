@@ -4,7 +4,6 @@ import numpy as np
 from PIL import Image, ImageEnhance
 from document_verification.vision_client import call_vision, encode_image
 
-# ── Two focused prompts (simple YES/NO — far more reliable than 3-way) ───────
 
 _PROMPT_STEP1 = (
     "Look at this image carefully. Is there a government-issued identity document "
@@ -22,16 +21,9 @@ _PROMPT_STEP2 = (
 
 
 def preprocess_image(input_path: str) -> str:
-    """
-    Preprocess the image before sending to the vision model:
-    1. Auto-crop dark borders so the document fills the frame
-    2. Boost contrast + sharpness so text/photo/emblem is clearer
-    3. Resize to max 1024px on the longest side
-    Returns path to a new temp JPEG. Caller is responsible for deleting it.
-    """
+    """Crop, sharpen and resize to 1024px. Returns a temp JPEG the caller must delete."""
     img = Image.open(input_path).convert('RGB')
 
-    # Auto-crop: pixels darker than 25 are treated as background
     arr = np.array(img.convert('L'))
     mask = arr > 25
     rows = np.any(mask, axis=1)
@@ -46,15 +38,12 @@ def preprocess_image(input_path: str) -> str:
         cmax = min(arr.shape[1], cmax + pad)
         img = img.crop((cmin, rmin, cmax, rmax))
 
-    # Upscale small/distant photos so text/photo/emblem is legible to the VLM
     if max(img.size) < 1000:
         img = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
 
-    # Gentle enhancement — VLMs prefer natural images; heavy boosts add artifacts
     img = ImageEnhance.Contrast(img).enhance(1.2)
     img = ImageEnhance.Sharpness(img).enhance(1.2)
 
-    # Cap the longest side
     max_dim = 1600
     if max(img.size) > max_dim:
         ratio = max_dim / max(img.size)
@@ -70,21 +59,12 @@ def preprocess_image(input_path: str) -> str:
 
 
 def analyze_document(image_path: str) -> dict:
-    """
-    Two-step document classification using llava:7b vision model.
-
-    Step 1: Is there a government ID document with a person's photo? → YES / NO
-    Step 2 (only if YES): Is it a Passport or a National ID card? → PASSPORT / NID
-
-    Returns: { success, document_type, error }
-    """
-    # ── Preprocess: crop dark borders + enhance ───────────────────────────
+    """Two-step document classification using llava:7b vision model."""
     preprocessed_path = None
     try:
         preprocessed_path = preprocess_image(image_path)
         image_b64 = encode_image(preprocessed_path)
     except Exception:
-        # Preprocessing failed — fall back to original image
         try:
             image_b64 = encode_image(image_path)
         except (OSError, IOError) as e:
@@ -94,7 +74,6 @@ def analyze_document(image_path: str) -> dict:
         if preprocessed_path and os.path.exists(preprocessed_path):
             os.remove(preprocessed_path)
 
-    # ── Step 1: Is there a government identity document with a photo? ─────
     r1 = call_vision(image_b64, _PROMPT_STEP1, num_predict=10)
     if not r1['success']:
         return {'success': False, 'document_type': None, 'error': r1['error']}
@@ -108,7 +87,6 @@ def analyze_document(image_path: str) -> dict:
             'error': None,
         }
 
-    # ── Step 2: Passport or National ID card? ────────────────────────────
     r2 = call_vision(image_b64, _PROMPT_STEP2, num_predict=15)
     if not r2['success']:
         return {'success': False, 'document_type': None, 'error': r2['error']}

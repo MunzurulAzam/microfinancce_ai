@@ -19,7 +19,6 @@
     cursor: not-allowed;
 }
 
-/* Sizes */
 .btn-sm {
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
@@ -35,7 +34,6 @@
     font-size: 1.125rem;
 }
 
-/* Variants */
 .btn-primary {
     background: var(--gradient-primary);
     color: white;
@@ -88,12 +86,10 @@
     color: var(--yellow-700);
 }
 
-/* Full width */
 .btn-full {
     width: 100%;
 }
 
-/* Loading state */
 .btn-loading {
     color: transparent;
 }

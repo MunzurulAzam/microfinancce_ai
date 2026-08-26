@@ -1,13 +1,4 @@
-"""
-Pooled read access to the DW warehouse.
 
-Connecting to DW costs ~2s while a query round-trip costs ~0.2s, so connections
-are pooled and reused; the pool is the single biggest latency win in ask_ai.
-
-Everything the LLM writes goes through validate_sql() (a dry run that never
-executes) and then run_sql(), which executes inside a transaction that is always
-rolled back. The DW login has write rights, so those two layers matter.
-"""
 import queue
 import re
 import threading
@@ -20,8 +11,7 @@ from ask_ai.config import (
     POOL_SIZE, QUERY_TIMEOUT, LOGIN_TIMEOUT, LOCK_TIMEOUT_MS, MAX_RESULT_ROWS,
 )
 
-# MSSQL 207 = invalid column, 208 = invalid object. A retry cannot fix either —
-# they mean the model hallucinated a name (same rule the old sync used).
+
 _PERMANENT = re.compile(r'invalid (column|object) name|\b20[78]\b', re.IGNORECASE)
 
 
@@ -34,9 +24,7 @@ class QueryError(Exception):
 
 
 class _Pool:
-    """Fixed-size connection pool. Connections are created lazily and discarded
-    whenever they may be in an unknown state — a client-side timeout kills the
-    pymssql socket, so a timed-out connection must never go back in the pool."""
+    """Fixed-size connection pool."""
 
     def __init__(self, size):
         self._idle = queue.LifoQueue(maxsize=size)
@@ -61,8 +49,7 @@ class _Pool:
             as_dict=False,
         )
         cur = conn.cursor()
-        # Read uncommitted so an analytical scan never blocks a production writer,
-        # and bail out fast rather than queue behind someone else's lock.
+        # Read uncommitted so an analytical scan never blocks a production writer.
         cur.execute(
             f'SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; '
             f'SET LOCK_TIMEOUT {LOCK_TIMEOUT_MS};'
@@ -88,7 +75,6 @@ class _Pool:
                 with self._lock:
                     self._created -= 1
                 raise
-        # Pool is at capacity — wait for someone to hand a connection back.
         try:
             return self._idle.get(timeout=QUERY_TIMEOUT)
         except queue.Empty:
@@ -123,11 +109,7 @@ def pool_stats():
 
 
 def _execute(sql, params=None):
-    """Run one statement on a pooled connection and return (columns, raw_rows).
-
-    Wrapped in a transaction that is always rolled back: the DW login is a
-    db_owner, so if anything ever slipped past sql_guard it still cannot commit.
-    """
+    """Run one statement on a pooled connection and return (columns, raw_rows)."""
     conn = _pool.acquire()
     reusable = False
     try:
@@ -145,8 +127,7 @@ def _execute(sql, params=None):
         except pymssql.Error as e:
             failure = e
 
-        # Always unwind. Succeeding here also proves the socket is still usable,
-        # so an ordinary "invalid column name" costs a retry, not a 2s reconnect.
+        # Unwinding also proves the socket is alive — a bad column costs a retry, not a reconnect.
         try:
             cur.execute('IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;')
             reusable = True
@@ -164,8 +145,6 @@ def _execute(sql, params=None):
             )
         return columns, rows
     except pymssql.Error as e:
-        # Anything outside the guarded block (opening the cursor, a dropped
-        # socket mid-fetch) — surface it in the same shape as a query error.
         raise QueryError(_clean_error(e))
     finally:
         # A timed-out connection is dead — never hand it to the next request.
@@ -173,8 +152,7 @@ def _execute(sql, params=None):
 
 
 def _clean_error(e):
-    """pymssql raises (code, b'message...DB-Lib error message 20018...'). Keep
-    just the server's own sentence — that is what tells the model what to fix."""
+    """pymssql raises (code, b'message...DB-Lib error message 20018...')."""
     raw = e.args[-1] if e.args else e
     if isinstance(raw, bytes):
         raw = raw.decode('utf-8', 'replace')
@@ -183,12 +161,7 @@ def _clean_error(e):
 
 
 def validate_sql(sql):
-    """Dry-run the query. Returns (ok, error, columns) without executing it.
-
-    sp_describe_first_result_set compiles the statement and reports its result
-    shape, so hallucinated tables and columns are caught in ~0.4s instead of
-    after a multi-second scan — and the error text is what feeds the LLM repair.
-    """
+    """Dry-run the query. Returns (ok, error, columns) without executing it."""
     try:
         _, rows = _execute('EXEC sp_describe_first_result_set @tsql = %s', (sql,))
     except QueryError as e:
@@ -198,11 +171,7 @@ def validate_sql(sql):
 
 
 def _parse_error(sql):
-    """sp_describe_first_result_set reports syntax problems as a useless
-    "batch could not be analyzed". Re-check inside a block whose condition is
-    never true: the server still parses and binds it, so the real syntax error
-    surfaces, but the query itself can never run — even a 109M-row scan returns
-    in ~0.2s. Unlike SET PARSEONLY this leaves no session state behind."""
+    """sp_describe_first_result_set reports syntax problems as a useless "batch could not be analyzed"."""
     try:
         _execute(f'IF 1 = 0 BEGIN\n{sql}\nEND')
     except QueryError as e:
@@ -211,12 +180,6 @@ def _parse_error(sql):
 
 
 def run_sql(sql, max_rows=MAX_RESULT_ROWS):
-    """Execute a validated SELECT. Returns (columns, rows, truncated) with rows
-    as dicts keyed by column name — the shape the frontend's ResultTable expects.
-
-    sql_guard injects TOP (n) where it can, but it cannot place one on the final
-    SELECT of a CTE, so the cap is also enforced here.
-    """
     columns, raw = _execute(sql)
     truncated = len(raw) > max_rows
     rows = [dict(zip(columns, _coerce(r))) for r in raw[:max_rows]]
@@ -224,8 +187,7 @@ def run_sql(sql, max_rows=MAX_RESULT_ROWS):
 
 
 def query(sql, params=None):
-    """Parameterized read for the module's own hand-written SQL (member analysis).
-    Returns a list of dicts; never used for model-generated SQL."""
+    """Parameterized read for the module's own hand-written SQL (member analysis)."""
     columns, raw = _execute(sql, params)
     return [dict(zip(columns, _coerce(r))) for r in raw]
 

@@ -10,11 +10,7 @@ doc_verify_bp = Blueprint('document_verification', __name__)
 
 @doc_verify_bp.route('/verify-document', methods=['POST'])
 def verify_document():
-    """
-    POST /api/verify-document
-    Accepts: multipart/form-data with field 'document' (JPEG image)
-    Returns: { success, document_type } or { success: false, error }
-    """
+    """POST /api/verify-document — multipart 'document' (JPEG), returns the document type."""
     if 'document' not in request.files:
         return jsonify({
             'success': False,

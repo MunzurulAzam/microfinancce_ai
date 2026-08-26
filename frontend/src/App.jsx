@@ -30,7 +30,6 @@ function App() {
   );
 }
 
-// Placeholder for coming soon pages
 function ComingSoon({ page }) {
   return (
     <div style={{

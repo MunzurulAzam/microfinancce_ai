@@ -1,8 +1,5 @@
 import axios from 'axios';
 
-// Reads from .env (Vercel) or .env.local (local dev)
-// Production:  VITE_API_BASE_URL = https://microfinancce-ai.onrender.com/api
-// Local dev:   VITE_API_BASE_URL = http://localhost:5001/api
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://microfinancce-ai.onrender.com/api';
 
 const api = axios.create({
@@ -13,8 +10,6 @@ const api = axios.create({
     withCredentials: false,   // must be false when backend uses wildcard/list origins
 });
 
-// ─── Conversational endpoint ──────────────────────────────────────────────────
-
 export const askQuestion = async (question) => {
     try {
         const response = await api.post('/ask', { question });
@@ -23,8 +18,6 @@ export const askQuestion = async (question) => {
         throw error.response?.data || error.message;
     }
 };
-
-// ─── Warehouse Q&A (text-to-SQL over the DW warehouse, all 4 countries) ───────
 
 export const askWarehouse = async (question, { country = null, summary = true } = {}) => {
     try {
@@ -39,8 +32,6 @@ export const askWarehouse = async (question, { country = null, summary = true } 
         throw error.response?.data || error.message;
     }
 };
-
-// ─── Data endpoints ───────────────────────────────────────────────────────────
 
 export const uploadCSV = async (file) => {
     try {
@@ -85,8 +76,6 @@ export const getGroups = async (limit = 100, offset = 0, search = null) => {
         throw error.response?.data || error.message;
     }
 };
-
-// ─── Analysis endpoints ───────────────────────────────────────────────────────
 
 export const getInsights = async () => {
     try {
@@ -151,8 +140,6 @@ export const analyzeGroup = async (groupName) => {
     }
 };
 
-// ─── Document Verification endpoint ──────────────────────────────────────────
-
 export const verifyDocument = async (imageFile) => {
     try {
         const data = new FormData();
@@ -165,8 +152,6 @@ export const verifyDocument = async (imageFile) => {
         throw error.response?.data || error.message;
     }
 };
-
-// ─── NID / VoterID Scanner endpoint ──────────────────────────────────────────
 
 export const scanIDCard = async (imageFile) => {
     try {
@@ -181,8 +166,6 @@ export const scanIDCard = async (imageFile) => {
         throw error.response?.data || error.message;
     }
 };
-
-// ─── Evaluation endpoint ──────────────────────────────────────────────────────
 
 export const evaluateApplicant = async (formData, pdfFile) => {
     try {

@@ -1,8 +1,4 @@
-"""
-MSSQL Data Service
-Replaces CSV-based data_processor for all portfolio-level features.
-Uses the same credit scoring logic as the individual credit score endpoint.
-"""
+"""MSSQL-backed portfolio data — replaces the CSV store for every portfolio feature."""
 
 import pymssql
 from datetime import datetime, date
@@ -10,8 +6,6 @@ from decimal import Decimal
 from config import Config
 from credit_scoring.scoring import calculate_credit_score
 
-
-# ─── DB Connection ────────────────────────────────────────────────────────────
 
 def _get_connection():
     return pymssql.connect(
@@ -36,13 +30,8 @@ def _to_float(val):
         return 0.0
 
 
-# ─── Fetch light member list for bulk scoring ─────────────────────────────────
-
 def _fetch_active_members(limit=200):
-    """
-    Fetch active members with their latest loan info in one query.
-    Returns a list of dicts with just enough fields for lightweight scoring.
-    """
+    """Fetch active members with their latest loan info in one query."""
     conn = _get_connection()
     cursor = conn.cursor()
     try:
@@ -96,9 +85,6 @@ def _fetch_active_members(limit=200):
 
 
 def _fetch_collection_summary(member_id, loan_id):
-    """
-    Fetch repayment summary for one loan (total + overdue collections).
-    """
     if not loan_id:
         return 0, 0
     conn = _get_connection()
@@ -119,7 +105,6 @@ def _fetch_collection_summary(member_id, loan_id):
 
 
 def _fetch_prev_overdue(member_id, prev_loan_id):
-    """Overdue count from previous loan cycle."""
     if not prev_loan_id:
         return 0
     conn = _get_connection()
@@ -137,12 +122,7 @@ def _fetch_prev_overdue(member_id, prev_loan_id):
 
 
 def _build_scoring_data(row):
-    """
-    Build the 'data' dict that calculate_credit_score() expects,
-    using only the fields available from the bulk query (fast path).
-    Heavy fields (branch/LO performance) are skipped for bulk scoring —
-    we only use client-level scoring for ranking purposes.
-    """
+    """Build the 'data' dict that calculate_credit_score() expects, using only the fields available from the bulk query (fast path)."""
     dob = row.get('DateOfBirth')
     age = None
     if dob:
@@ -177,12 +157,12 @@ def _build_scoring_data(row):
             'EmployeeId':      row.get('EmployeeId'),
         } if loan_id else None,
         'loans':               [{'LoanId': loan_id, 'Cycle': row.get('LoanCycle')}] if loan_id else [],
-        'prev_overdue_count':  0,          # requires extra query; neutral for bulk
+        'prev_overdue_count':  0,
         'total_collections':   total_col,
         'overdue_collections': overdue_col,
-        'group_member_count':  0,          # neutral for bulk
+        'group_member_count':  0,
         'mobile_changed':      False,
-        'additional_info':     {},         # MfMemberAdditionalInfo — neutral for bulk
+        'additional_info':     {},
         'business':            {},
         'current_guarantor':   None,
         'prev_guarantor':      None,
@@ -190,7 +170,6 @@ def _build_scoring_data(row):
         'branch_id':           row.get('BranchId'),
         'employee':            {'EmployeeName': row.get('LOName', 'N/A')},
         'employee_id':         row.get('EmployeeId'),
-        # Branch / LO performance (skip for bulk — use neutral values)
         'branch_total_borrowers':  0,
         'branch_total_active_loans': 0,
         'branch_par_loans':        0,
@@ -203,12 +182,7 @@ def _build_scoring_data(row):
     }
 
 
-# ─── Public API ──────────────────────────────────────────────────────────────
-
 def get_basic_stats():
-    """
-    Portfolio-level statistics from MSSQL.
-    """
     try:
         conn = _get_connection()
         cursor = conn.cursor()
@@ -235,7 +209,6 @@ def get_basic_stats():
         total_portfolio  = _to_float(loan_row['portfolio'])
         average_loan     = _to_float(loan_row['avg_loan'])
 
-        # Clients with at least one overdue collection
         cursor.execute(
             "SELECT COUNT(DISTINCT l.MemberId) AS cnt "
             "FROM MfLoan l "
@@ -253,7 +226,7 @@ def get_basic_stats():
             'total_loans':          total_loans,
             'total_loan_portfolio': total_portfolio,
             'average_loan_amount':  average_loan,
-            'average_client_score': 0,     # computed separately when needed
+            'average_client_score': 0,
             'clients_with_overdue': clients_with_overdue,
         }
     except Exception as e:
@@ -262,9 +235,6 @@ def get_basic_stats():
 
 
 def get_all_clients(limit=100, offset=0, search=None):
-    """
-    Return paginated client list from MSSQL.
-    """
     try:
         conn = _get_connection()
         cursor = conn.cursor()
@@ -316,9 +286,6 @@ def get_all_clients(limit=100, offset=0, search=None):
 
 
 def get_all_groups(limit=100, offset=0, search=None):
-    """
-    Return paginated group list from MSSQL.
-    """
     try:
         conn = _get_connection()
         cursor = conn.cursor()
@@ -363,10 +330,7 @@ def get_all_groups(limit=100, offset=0, search=None):
 
 
 def get_top_performers(limit=10, performance_type='clients'):
-    """
-    Score active members using the same credit scoring logic, then return top/bottom.
-    performance_type: 'clients' or 'groups'
-    """
+    """Score active members using the same credit scoring logic, then return top/bottom."""
     try:
         members = _fetch_active_members(limit=min(limit * 10, 300))
 
@@ -386,18 +350,16 @@ def get_top_performers(limit=10, performance_type='clients'):
                     'group':       row.get('GroupName', 'N/A'),
                     'branch':      row.get('BranchName', 'N/A'),
                     'lo':          row.get('LOName', 'N/A'),
-                    'overdue_count': 0,  # overdue_collections from collection summary
+                    'overdue_count': 0,
                 })
             except Exception:
                 continue
 
         if performance_type == 'clients':
-            # Top = highest score
             top = sorted(scored, key=lambda x: x['score'], reverse=True)[:limit]
             return top
 
         elif performance_type == 'groups':
-            # Aggregate by group name
             group_map = {}
             for s in scored:
                 g = s['group']
@@ -425,10 +387,6 @@ def get_top_performers(limit=10, performance_type='clients'):
 
 
 def get_risk_analysis(overdue_threshold=3):
-    """
-    Identify high-risk clients using credit score classification from MSSQL data.
-    High risk = classification 'High Risk' OR 'Moderate Risk' (score < 70%).
-    """
     try:
         members = _fetch_active_members(limit=300)
 
@@ -440,7 +398,6 @@ def get_risk_analysis(overdue_threshold=3):
                 data = _build_scoring_data(row)
                 result = calculate_credit_score(data)
 
-                # High risk = score below 70% (Moderate Risk or High Risk)
                 if result['percentage'] < 70:
                     loan_amount = _to_float(row.get('PrincipalAmount'))
                     overdue_col = data['overdue_collections']
@@ -460,7 +417,6 @@ def get_risk_analysis(overdue_threshold=3):
             except Exception:
                 continue
 
-        # Sort by score ascending (worst first)
         high_risk.sort(key=lambda x: x['score'])
 
         return {
@@ -479,7 +435,6 @@ def get_risk_analysis(overdue_threshold=3):
 
 
 def get_quick_insights():
-    """Generate quick portfolio insights from MSSQL."""
     try:
         return {
             'top_clients':      get_top_performers(5, 'clients'),

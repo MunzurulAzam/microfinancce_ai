@@ -5,8 +5,7 @@ import time
 
 
 class TTLCache:
-    """Small thread-safe TTL cache. Used for the DW schema (rarely changes) and
-    for query results (the same handful of questions get asked repeatedly)."""
+    """Small thread-safe TTL cache."""
 
     def __init__(self, ttl, max_entries=256):
         self.ttl = ttl
@@ -34,7 +33,6 @@ class TTLCache:
             if len(self._data) >= self.max_entries:
                 self._evict_expired()
             if len(self._data) >= self.max_entries:
-                # Still full — drop the entry closest to expiry.
                 oldest = min(self._data, key=lambda k: self._data[k][0])
                 del self._data[oldest]
             self._data[key] = (time.time() + self.ttl, value)

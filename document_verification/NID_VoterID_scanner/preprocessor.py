@@ -5,17 +5,7 @@ from PIL import Image, ImageEnhance
 
 
 def preprocess_id_image(input_path: str) -> str:
-    """
-    Preprocesses an ID card image for the vision model:
-    1. Convert to RGB (handles PNG with alpha, WebP, grayscale)
-    2. Auto-crop dark/blank borders (threshold 30, padding 10px)
-    3. Upscale small/distant photos (longest side < 1000px) so text is legible
-    4. Gentle contrast/sharpness boost (VLMs prefer natural images — heavy
-       enhancement introduces artifacts that cause misreads)
-    5. Resize down to max 1600px on longest side
-
-    Returns path to a new temp JPEG. Caller must delete it (use try/finally).
-    """
+    """Crop, upscale and lightly enhance an ID photo. Returns a temp JPEG the caller must delete."""
     img = Image.open(input_path).convert('RGB')
 
     arr = np.array(img.convert('L'))

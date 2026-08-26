@@ -1,8 +1,3 @@
-"""
-Analysis routes
-Handles client and group analysis requests
-"""
-
 from flask import Blueprint, request, jsonify
 from portfolio.analyzer import analyze_client, analyze_group
 from portfolio.performance import (
@@ -17,12 +12,7 @@ analysis_bp = Blueprint('analysis', __name__)
 
 @analysis_bp.route('/client', methods=['POST'])
 def analyze_client_endpoint():
-    """
-    Analyze a specific client
-    
-    Request body: {"client_name": "John Doe"}
-    Response: Client analysis with AI insights
-    """
+    """POST — {"client_name": str} in, client analysis with AI insights out."""
     try:
         data = request.get_json()
         
@@ -49,12 +39,7 @@ def analyze_client_endpoint():
 
 @analysis_bp.route('/group', methods=['POST'])
 def analyze_group_endpoint():
-    """
-    Analyze a specific group
-    
-    Request body: {"group_name": "Group A"}
-    Response: Group analysis with AI insights
-    """
+    """POST — {"group_name": str} in, group analysis with AI insights out."""
     try:
         data = request.get_json()
         
@@ -81,11 +66,7 @@ def analyze_group_endpoint():
 
 @analysis_bp.route('/insights', methods=['GET'])
 def get_insights():
-    """
-    Get quick insights about the portfolio
-    
-    Response: Comprehensive insights including top performers and risks
-    """
+    """Portfolio-wide insights: top performers and risks."""
     try:
         insights = get_quick_insights()
         
@@ -109,14 +90,7 @@ def get_insights():
 
 @analysis_bp.route('/top-clients', methods=['GET'])
 def get_top_clients():
-    """
-    Get top performing clients
-    
-    Query params:
-        - limit: Number of results (default: 10)
-    
-    Response: List of top performing clients
-    """
+    """Top performing clients; ?limit= defaults to 10."""
     try:
         limit = int(request.args.get('limit', 10))
         
@@ -137,14 +111,7 @@ def get_top_clients():
 
 @analysis_bp.route('/top-groups', methods=['GET'])
 def get_top_groups():
-    """
-    Get top performing groups
-    
-    Query params:
-        - limit: Number of results (default: 10)
-    
-    Response: List of top performing groups
-    """
+    """Top performing groups; ?limit= defaults to 10."""
     try:
         limit = int(request.args.get('limit', 10))
         
@@ -165,14 +132,7 @@ def get_top_groups():
 
 @analysis_bp.route('/risk-analysis', methods=['GET'])
 def risk_analysis():
-    """
-    Get risk analysis for high-risk clients
-    
-    Query params:
-        - threshold: Overdue count threshold (default: 5)
-    
-    Response: List of high-risk clients and statistics
-    """
+    """High-risk clients; ?threshold= is the overdue count, default 5."""
     try:
         threshold = int(request.args.get('threshold', 5))
         
@@ -192,11 +152,7 @@ def risk_analysis():
 
 @analysis_bp.route('/business-performance', methods=['GET'])
 def business_performance():
-    """
-    Get performance analysis by business type
-    
-    Response: Performance metrics for each business type
-    """
+    """Performance metrics per business type."""
     try:
         business_data = get_business_performance()
         

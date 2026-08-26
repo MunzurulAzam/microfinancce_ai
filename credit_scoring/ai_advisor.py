@@ -1,18 +1,9 @@
-"""
-Ollama Service
-Sends credit scores to local Ollama model for AI-powered analysis
-"""
-
 import requests
 import json
 from config import Config
 
 
 def get_ai_analysis(score_result):
-    """
-    Send credit score data to Ollama for AI analysis.
-    Falls back to template-based response if Ollama is unavailable.
-    """
     try:
         prompt = _build_prompt(score_result)
         response = requests.post(
@@ -45,18 +36,15 @@ def get_ai_analysis(score_result):
 
 
 def _build_prompt(score_result):
-    """Build the prompt for Ollama."""
 
-    # Collect weak parameters (score <= 2)
     weak_params = []
-    for cat_key in ['client_scoring']:  # branch_scoring, lo_scoring disabled (Client-Only Mode)
+    for cat_key in ['client_scoring']:
         for d in score_result[cat_key]['details']:
             if d['score'] <= 2:
                 weak_params.append(f"- {d['parameter']}: {d['score']}/5 ({d['reason']})")
 
-    # Collect strong parameters (score == 5)
     strong_params = []
-    for cat_key in ['client_scoring']:  # branch_scoring, lo_scoring disabled (Client-Only Mode)
+    for cat_key in ['client_scoring']:
         for d in score_result[cat_key]['details']:
             if d['score'] == 5:
                 strong_params.append(f"- {d['parameter']}: {d['score']}/5 ({d['reason']})")
@@ -87,21 +75,18 @@ Keep it professional and specific to this client's data."""
 
 
 def _fallback_analysis(score_result):
-    """Template-based fallback when Ollama is not available."""
     classification = score_result['classification']
     percentage = score_result['percentage']
     name = score_result['member_name']
 
-    # Find weak areas
     weak = []
-    for cat_key in ['client_scoring']:  # branch_scoring, lo_scoring disabled (Client-Only Mode)
+    for cat_key in ['client_scoring']:
         for d in score_result[cat_key]['details']:
             if d['score'] <= 2:
                 weak.append(d['parameter'])
 
-    # Find strong areas
     strong = []
-    for cat_key in ['client_scoring']:  # branch_scoring, lo_scoring disabled (Client-Only Mode)
+    for cat_key in ['client_scoring']:
         for d in score_result[cat_key]['details']:
             if d['score'] == 5:
                 strong.append(d['parameter'])

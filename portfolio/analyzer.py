@@ -1,13 +1,8 @@
-"""
-Analysis service combining data processing with AI analysis
-"""
-
 from portfolio.csv_store import data_processor
 from core.llm import llama_handler
 
 
 def create_client_context(client_data):
-    """Create context string for client analysis"""
     context = f"""
 CLIENT ANALYSIS REPORT:
 Name: {client_data.get('clientName', 'N/A')}
@@ -25,7 +20,6 @@ Disbursement Date: {client_data.get('disbursementDate', 'N/A')}
 
 
 def create_group_context(group_name, group_data, member_details):
-    """Create context string for group analysis"""
     context = f"""
 GROUP ANALYSIS REPORT:
 Group Name: {group_name}
@@ -42,16 +36,7 @@ Member Performance Overview:
 
 
 def analyze_client(client_name):
-    """
-    Analyze a specific client
-    
-    Args:
-        client_name: Name of the client to analyze
-    
-    Returns:
-        Dictionary with client info and AI analysis
-    """
-    # Find client
+    """Client info plus AI analysis, looked up by name."""
     client_data = data_processor.find_client(client_name)
     
     if not client_data:
@@ -61,14 +46,11 @@ def analyze_client(client_name):
             'suggestions': data_processor.get_all_clients(limit=5)
         }
     
-    # Create context
     context = create_client_context(client_data)
     
-    # Get AI analysis
     prompt = "Analyze this client's performance and provide recommendations in a friendly, conversational tone"
     ai_analysis = llama_handler.analyze_with_ai(prompt, context)
     
-    # Prepare response
     result = {
         'success': True,
         'client_info': {
@@ -90,16 +72,7 @@ def analyze_client(client_name):
 
 
 def analyze_group(group_name):
-    """
-    Analyze a specific group
-    
-    Args:
-        group_name: Name of the group to analyze
-    
-    Returns:
-        Dictionary with group info and AI analysis
-    """
-    # Find group
+    """Group info plus AI analysis, looked up by name."""
     group_data = data_processor.find_group(group_name)
     
     if not group_data:
@@ -109,22 +82,17 @@ def analyze_group(group_name):
             'suggestions': data_processor.get_all_groups(limit=5)
         }
     
-    # Get top members
     top_members = data_processor.get_group_members(group_name, top_n=5)
     
-    # Create member details string
     member_details = "Top Performers:\n"
     for member in top_members:
         member_details += f"- {member['name']}: Score {member['score']}, Loan: {member['loan_amount']:,} UGX\n"
     
-    # Create context
     context = create_group_context(group_data['groupName'], group_data, member_details)
     
-    # Get AI analysis
     prompt = "Analyze this group's overall performance and provide friendly recommendations for improvement"
     ai_analysis = llama_handler.analyze_with_ai(prompt, context)
     
-    # Prepare response
     result = {
         'success': True,
         'group_info': {
@@ -145,7 +113,6 @@ def analyze_group(group_name):
 
 
 def _calculate_risk_level(client_data):
-    """Calculate risk level for a client"""
     score = client_data.get('client_performance_score', 0)
     overdue = client_data.get('OverdueCollectionCount', 0)
     
@@ -158,7 +125,6 @@ def _calculate_risk_level(client_data):
 
 
 def _calculate_group_risk_level(group_data):
-    """Calculate risk level for a group"""
     avg_score = group_data.get('avg_score', 0)
     total_overdue = group_data.get('total_overdue', 0)
     member_count = group_data.get('member_count', 1)

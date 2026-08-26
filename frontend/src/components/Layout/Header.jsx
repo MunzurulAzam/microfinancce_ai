@@ -12,9 +12,7 @@ const Header = () => {
         { path: '/verify', label: 'Verify Doc', icon: ShieldCheck },
         { path: '/scan-id', label: 'Scan ID', icon: ScanLine },
         { path: '/upload', label: 'Upload', icon: Upload },
-        // { path: '/dashboard', label: 'Dashboard', icon: BarChart3 },
-        // { path: '/clients', label: 'Clients', icon: Users },
-        // { path: '/risk', label: 'Risk', icon: AlertTriangle },
+        
     ];
 
     return (

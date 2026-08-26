@@ -23,7 +23,6 @@ COUNTRY_REGISTRY = [
         'name': 'Tanzania',
         'code': 'TZ',
         'id_type': 'NIDA National ID',
-        # NIDA numbers are printed hyphenated (8-5-5-2) or as 20 plain digits.
         'pattern': re.compile(r'\b\d{8}-\d{5}-\d{5}-\d{2}\b|\b\d{20}\b'),
         'keywords': ['tanzania', 'jamhuri ya muungano', 'nida', 'tanzanian',
                      'dodoma', 'dar es salaam'],

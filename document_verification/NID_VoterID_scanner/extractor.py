@@ -1,11 +1,3 @@
-"""
-NID/VoterID text extraction.
-Primary:  Ollama vision model (Config.OLLAMA_VISION_MODEL) — set to a `-cloud`
-          tag (e.g. qwen3-vl:235b-cloud) for best-in-class, any-country/any-
-          language document understanding via the local daemon.
-Fallback: EasyOCR — local, no-network OCR used only when the vision call fails
-          (e.g. offline, or the model isn't available).
-"""
 import re
 import threading
 from typing import List, Optional
@@ -13,7 +5,6 @@ from typing import List, Optional
 from document_verification.NID_VoterID_scanner.country_patterns import COUNTRY_REGISTRY
 from document_verification.vision_client import call_vision, encode_image, extract_json_dict
 
-# ── EasyOCR reader (cached at module level — loaded once per server start) ────
 _reader = None
 _reader_lock = threading.Lock()
 
@@ -25,17 +16,13 @@ def _get_reader():
             if _reader is None:
                 import os
                 import certifi
-                # macOS Python framework ships without a CA bundle, so EasyOCR's
-                # one-time model download fails with SSL: CERTIFICATE_VERIFY_FAILED.
-                # Point SSL verification at certifi's bundle so the download works.
+                # macOS Python ships no CA bundle — point EasyOCR's model download at certifi's.
                 os.environ.setdefault('SSL_CERT_FILE', certifi.where())
                 os.environ.setdefault('SSL_CERT_DIR', os.path.dirname(certifi.where()))
                 import easyocr
                 _reader = easyocr.Reader(['en'], verbose=False)
     return _reader
 
-
-# ── Field label vocabularies ──────────────────────────────────────────────────
 
 _SURNAME_LABELS = frozenset({
     'SURNAME', 'SURNAMES', 'LAST NAME', 'LAST NAMES', 'FAMILY NAME',
@@ -65,7 +52,6 @@ _ID_TYPE_PHRASES = frozenset({
     'NATIONAL REGISTRATION CARD', 'NIN CARD', 'NID CARD',
 })
 
-# All tokens that should NOT be mistaken for a person's name value
 _ALL_LABELS: frozenset = (
     _SURNAME_LABELS | _GIVEN_NAME_LABELS | _FULL_NAME_LABELS
     | _ID_LABELS | _ID_TYPE_PHRASES | frozenset({
@@ -85,14 +71,8 @@ _DATE_RE = re.compile(r'^\d{1,2}[./\-]\d{1,2}[./\-]\d{2,4}$')
 _PURE_NUM_RE = re.compile(r'^\d+$')
 
 
-# ── Main entry point ──────────────────────────────────────────────────────────
-
 def extract_id_data(image_path: str) -> dict:
-    """
-    Try the vision model first (any country, any language, stylized fonts,
-    glare/blur). Fall back to local EasyOCR if the vision call fails.
-    Returns the dict structure expected by service.py.
-    """
+    """Try the vision model first (any country, any language, stylized fonts, glare/blur)."""
     vision_unavailable = False
     try:
         result = _extract_with_vision(image_path)
@@ -105,10 +85,7 @@ def extract_id_data(image_path: str) -> dict:
         vision_unavailable = True
         print(f'[NIDScanner] Vision extraction crashed ({vision_error}).')
 
-    # EasyOCR is used ONLY as a genuine offline fallback (Ollama down / model not
-    # pulled). For any other vision hiccup — cloud overload (503), an empty or
-    # non-JSON reply — we do NOT return EasyOCR's guess, because a confidently
-    # WRONG ID number is worse than asking the user to scan again.
+    # EasyOCR only when Ollama is genuinely absent — a wrong ID number is worse than a rescan.
     if not vision_unavailable:
         return _error_result(
             'Could not read the card reliably (the cloud vision model is busy '
@@ -127,8 +104,6 @@ def extract_id_data(image_path: str) -> dict:
             f'Both vision and EasyOCR extraction failed. EasyOCR: {type(e).__name__}: {e}'
         )
 
-
-# ── Vision-model extraction (primary) ──────────────────────────────────────────
 
 _VISION_PROMPT = (
     "You are reading a government-issued identity card (national ID or voter ID) "
@@ -189,8 +164,6 @@ def _clean(value) -> Optional[str]:
     return s or None
 
 
-# ── EasyOCR extraction ────────────────────────────────────────────────────────
-
 def _extract_with_easyocr(image_path: str) -> dict:
     reader = _get_reader()
     raw = reader.readtext(image_path, detail=1)
@@ -198,10 +171,8 @@ def _extract_with_easyocr(image_path: str) -> dict:
     if not raw:
         return _error_result('EasyOCR could not detect any text in the image.')
 
-    # Sort blocks top-to-bottom by the minimum Y coordinate of their bounding box
     blocks = sorted(raw, key=lambda r: min(pt[1] for pt in r[0]))
 
-    # Keep only high-enough confidence blocks
     texts: List[str] = [b[1].strip() for b in blocks if b[2] > 0.3 and b[1].strip()]
     full_text = '\n'.join(texts)
 
@@ -228,17 +199,7 @@ def _extract_with_easyocr(image_path: str) -> dict:
 
 
 def _parse_name(texts: List[str]) -> Optional[str]:
-    """
-    Three strategies tried in order:
-
-    A) SURNAME label found → next real value block is surname;
-       GIVEN NAME label found → next real value block is given names.
-       Return "SURNAME GIVEN_NAMES".
-
-    B) FULL NAME / NAME label found → next real value block is the full name.
-
-    C) Inline colon on same block: "SURNAME: JJENGO" → split on ':'.
-    """
+    """Tries SURNAME + GIVEN NAME labels, then FULL NAME, then an inline "LABEL: value"."""
     surname = None
     given_names = None
     full_name = None
@@ -247,7 +208,6 @@ def _parse_name(texts: List[str]) -> Optional[str]:
         t = text.strip()
         tu = t.upper()
 
-        # Strategy C — inline colon (e.g. "SURNAME: JJENGO")
         if ':' in t:
             label_part, _, val_part = t.partition(':')
             lu = label_part.strip().upper()
@@ -262,13 +222,11 @@ def _parse_name(texts: List[str]) -> Optional[str]:
                 full_name = v
                 continue
 
-        # Strategy A
         if tu in _SURNAME_LABELS and surname is None:
             surname = _next_value(texts, i)
         elif tu in _GIVEN_NAME_LABELS and given_names is None:
             given_names = _next_value(texts, i)
 
-        # Strategy B
         elif tu in _FULL_NAME_LABELS and full_name is None:
             full_name = _next_value(texts, i)
 
@@ -278,14 +236,7 @@ def _parse_name(texts: List[str]) -> Optional[str]:
 
 
 def _next_value(texts: List[str], label_idx: int) -> Optional[str]:
-    """
-    Return the first text block after `label_idx` that looks like a real value:
-    - Not in _ALL_LABELS
-    - At least 2 characters
-    - Not purely numeric
-    - Not a date string
-    - Contains at least one letter
-    """
+    """First block after label_idx that looks like a value, not another label."""
     for j in range(label_idx + 1, min(label_idx + 7, len(texts))):
         c = texts[j].strip()
         cu = c.upper()
@@ -302,10 +253,7 @@ def _next_value(texts: List[str], label_idx: int) -> Optional[str]:
 
 
 def _parse_id_number(texts: List[str], full_text: str) -> Optional[str]:
-    """
-    Step 1: if a NIN/NID/etc label is found, search the next few blocks.
-    Step 2: global regex search across the full text (catches inline patterns).
-    """
+    """Searches the blocks after an ID label first, then the whole text for an inline match."""
     for i, text in enumerate(texts):
         if text.strip().upper() in _ID_LABELS:
             for j in range(i + 1, min(i + 6, len(texts))):
@@ -329,8 +277,6 @@ def _parse_id_type_hint(texts: List[str]) -> Optional[str]:
             return text.strip()
     return None
 
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _error_result(msg: str) -> dict:
     return {

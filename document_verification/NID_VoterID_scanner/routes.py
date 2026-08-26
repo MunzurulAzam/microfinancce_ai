@@ -13,13 +13,7 @@ nid_scanner_bp = Blueprint('nid_scanner', __name__)
 
 @nid_scanner_bp.route('/scan-id', methods=['POST'])
 def scan_id():
-    """
-    POST /api/scan-id
-    Input:  multipart/form-data, field 'id_image' (JPEG / PNG / WebP, max 10 MB)
-    Output: { success: true, data: { name, id_number, id_valid, country,
-               country_code, id_type, confidence, extractor, raw_text_sample } }
-            { success: false, error: '...' }
-    """
+    """POST /api/scan-id — multipart 'id_image' (JPEG/PNG/WebP, max 10 MB)."""
     if 'id_image' not in request.files:
         return jsonify({
             'success': False,

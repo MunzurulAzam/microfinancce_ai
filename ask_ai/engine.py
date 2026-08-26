@@ -8,8 +8,6 @@ from ask_ai.config import RESULT_CACHE_TTL
 from ask_ai.prompt import build_prompt, build_repair_prompt
 from ask_ai.sql_guard import has_country_filter, sanitize, strip_limit, UnsafeSQL
 
-# The same handful of questions get asked over and over (the UI ships canned
-# examples), so a successful answer is worth keeping for a few minutes.
 _results = TTLCache(RESULT_CACHE_TTL, max_entries=128)
 
 
@@ -17,15 +15,11 @@ def _cache_key(question, country, with_summary):
     return (' '.join(question.lower().split()), country, with_summary)
 
 
-#  member-analysis vs data question
-# Credit analysis is only ever about ONE identifiable person. A member code is
-# that proof; a phrase like "give me ... member ..." is not, and used to swallow
-# whole-branch questions such as "give me Nyangusu this branch total member name".
+# A member code proves one person; the phrase "... member ..." does not.
 _MEMBER_CODE = re.compile(r'\bCLN\d+\b', re.IGNORECASE)
 _MEMBER_ID = re.compile(r'^\s*\d{3,}\s*$')
 
-# Aggregate wording means the question is about a set of people, not a person —
-# it vetoes every phrase hint below.
+# Aggregate wording means a set of people, so it vetoes every phrase hint below.
 _AGGREGATE = re.compile(
     r'\b(total|totals|list|all|how many|count|counts|each|per|every|top|'
     r'average|avg|sum|names|breakdown|compare|trend|branch|branches|group|'
@@ -47,9 +41,7 @@ _WEAK_HINTS = [
 
 
 def _names_one_person(question):
-    """A member code (or a bare member id) identifies exactly one person, so it
-    outranks any aggregate wording — "all loans of CLN0189567" is still about
-    that member."""
+    """A member code outranks aggregate wording — "all loans of CLN0189567" is still one person."""
     return bool(_MEMBER_CODE.search(question)) or bool(_MEMBER_ID.match(question))
 
 
@@ -81,23 +73,16 @@ def route(question, country=None, with_summary=True):
         analysis = analyze_member(question, country=country)
         if analysis.get('success') or strong:
             return analysis
-        # weak intent + no member matched → treat as a data question.
     result = ask(question, country=country, with_summary=with_summary)
     result['mode'] = 'sql'
     return result
 
 
 def _generate_sql(question, country):
-    """Ask the model for SQL, then make it safe.
-
-    Returns (sql, raw, error, caller_fault) — caller_fault distinguishes "we
-    could not turn your question into SQL" (a 400) from Ollama or DW being down
-    (a 500).
-    """
+    """Ask the model for SQL, then make it safe."""
     try:
         prompt = build_prompt(question, country)
     except db.QueryError as e:
-        # Building the prompt reads the DW schema, so DW being down surfaces here.
         return None, None, f'Warehouse unavailable: {e}', False
 
     result = llm.generate(prompt)
@@ -110,7 +95,6 @@ def _generate_sql(question, country):
     except UnsafeSQL as e:
         if not getattr(e, 'fixable', False):
             return None, raw, str(e), True
-        # Aimed at the wrong country — as repairable as a bad column name.
         fixed, fix_error = _repair_sql(question, raw, str(e), country)
         if fixed:
             return fixed, raw, None, True
@@ -118,8 +102,7 @@ def _generate_sql(question, country):
 
 
 def _repair_sql(question, sql, error, country):
-    """One retry, handed the failed SQL and the server's own complaint. Much
-    cheaper and more effective than regenerating from a cold prompt."""
+    """One retry, handed the failed SQL and the server's own complaint."""
     result = llm.generate(build_repair_prompt(question, sql, error, country))
     if not result['success']:
         return None, result['error']
@@ -130,10 +113,7 @@ def _repair_sql(question, sql, error, country):
 
 
 def ask(question, country=None, with_summary=True):
-    """
-    Answer a natural-language question against DW.
-    Returns: {success, question, sql, columns, rows, row_count, answer?, error?}
-    """
+    """Answer a natural-language question against DW."""
     if not question or not question.strip():
         return {'success': False, 'error': 'Empty question.', 'bad_request': True}
 
@@ -147,10 +127,6 @@ def ask(question, country=None, with_summary=True):
         return {'success': False, 'error': error, 'sql': raw,
                 'bad_request': caller_fault}
 
-    # The model was told the scope, but it may express it some other way (a
-    # branch that exists in one country only) or forget it. Ask once, then get
-    # on with it — blocking the user over a filter we cannot prove is missing
-    # rejected correct queries.
     country_enforced = has_country_filter(sql, country)
     if country and not country_enforced:
         scoped, _ = _repair_sql(
@@ -163,8 +139,6 @@ def ask(question, country=None, with_summary=True):
             if ok:
                 sql, country_enforced = scoped, True
 
-    # Dry run: catches hallucinated tables and columns in ~0.4s, before the
-    # server pays for a scan — and gives the repair prompt something concrete.
     ok, validation_error, _ = db.validate_sql(sql)
     if not ok:
         repaired, repair_error = _repair_sql(question, sql, validation_error, country)
@@ -193,8 +167,6 @@ def ask(question, country=None, with_summary=True):
         'truncated': truncated,
     }
     if country:
-        # False = we could not confirm the query is scoped to that country, so
-        # the caller can say so rather than mislabel the numbers.
         result['country_enforced'] = country_enforced
 
     if with_summary:
@@ -205,8 +177,7 @@ def ask(question, country=None, with_summary=True):
 
 
 def _invalid(question, sql, error, repaired, repair_error):
-    """Both attempts failed — return them so a bad generation is easy to debug
-    and easy to turn into a new few-shot example in glossary.py."""
+    """Return both failed attempts so a bad generation is easy to turn into a new example."""
     return {
         'success': False,
         'question': question,

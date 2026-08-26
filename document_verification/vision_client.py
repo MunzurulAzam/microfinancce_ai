@@ -1,15 +1,4 @@
-"""
-Shared vision-LLM client for both document modules:
-  - document_verification (passport / NID classifier)
-  - NID_VoterID_scanner   (field extraction)
-
-Talks to the LOCAL Ollama daemon (Config.OLLAMA_BASE_URL, default
-http://localhost:11434) via the /api/chat endpoint. To use an Ollama Cloud
-model (e.g. qwen3-vl:235b-cloud) simply set Config.OLLAMA_VISION_MODEL to a
-`-cloud` tag and run `ollama signin` + `ollama pull <model>` once — the local
-daemon transparently proxies cloud requests, so NO API key / Authorization
-header is needed here.
-"""
+"""Shared vision-LLM client for the passport/NID classifier and the NID/VoterID scanner."""
 import base64
 import json as _json
 import re
@@ -19,8 +8,7 @@ from typing import Optional
 import requests
 from config import Config
 
-# Free Ollama Cloud models can briefly return HTTP 503 ("temporarily
-# overloaded") or 429. Retry a few times with a short backoff before giving up.
+# Free Ollama Cloud briefly returns 503/429 under load — retry with a short backoff.
 _RETRY_STATUSES = {429, 503}
 _MAX_RETRIES = 3
 _RETRY_BACKOFF_SEC = 4
@@ -32,10 +20,7 @@ def encode_image(path: str) -> str:
 
 
 def _vision_models() -> list:
-    """Ordered list of models to try: primary (Config.OLLAMA_VISION_MODEL) plus
-    any comma-separated fallbacks (Config.OLLAMA_VISION_FALLBACKS). Free cloud
-    models can be transiently overloaded, so a second free vision model keeps
-    accuracy high instead of dropping to the weaker offline OCR."""
+    """OLLAMA_VISION_MODEL first, then the comma-separated OLLAMA_VISION_FALLBACKS."""
     models = [Config.OLLAMA_VISION_MODEL]
     fallbacks = getattr(Config, 'OLLAMA_VISION_FALLBACKS', '') or ''
     for m in fallbacks.split(','):
@@ -53,27 +38,21 @@ def call_vision(
     temperature: float = 0.1,
     timeout: int = 120,
 ) -> dict:
-    """
-    Vision call against {OLLAMA_BASE_URL}/api/chat. Tries the primary model,
-    then any configured fallback models if it is unavailable/overloaded.
-
-    Returns {'success': bool, 'text': str|None, 'error': str|None}.
-    """
+    """Vision call against {OLLAMA_BASE_URL}/api/chat."""
     last_error = None
     overloaded = False
-    any_reachable = False  # at least one model returned a (non-404) HTTP response
+    any_reachable = False
     for model in _vision_models():
         result = _call_one_model(model, image_b64, prompt, num_predict, temperature, timeout)
         if result['success']:
             return result
         last_error = result['error']
         overloaded = overloaded or result.get('overloaded', False)
-        if result.get('fatal'):  # Ollama daemon down / timeout — genuinely offline
+        if result.get('fatal'):
             return {'success': False, 'text': None, 'error': last_error,
                     'overloaded': False, 'unavailable': True}
         if not result.get('not_found'):
-            any_reachable = True  # got a real response, just not usable
-    # unavailable == every model was missing (not pulled) → true offline fallback
+            any_reachable = True
     return {'success': False, 'text': None, 'error': last_error,
             'overloaded': overloaded, 'unavailable': not any_reachable}
 
@@ -111,7 +90,6 @@ def _call_one_model(model, image_b64, prompt, num_predict, temperature, timeout)
             }
 
         if resp.status_code == 200:
-            # /api/chat returns {'message': {'content': '...'}, ...}
             data = resp.json()
             text = (data.get('message') or {}).get('content', '')
             return {'success': True, 'text': text, 'error': None}
@@ -127,7 +105,6 @@ def _call_one_model(model, image_b64, prompt, num_predict, temperature, timeout)
             }
 
         last_status_error = f'[{model}] Ollama HTTP {resp.status_code}: {body}'
-        # Transient cloud overload — wait and retry the same model.
         if resp.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES - 1:
             time.sleep(_RETRY_BACKOFF_SEC * (attempt + 1))
             continue
@@ -144,14 +121,8 @@ def _cloud_hint(model: str) -> str:
     return ''
 
 
-# ── Truncated-JSON repair (shared) ──────────────────────────────────────────
-
 def parse_possibly_truncated_json(candidate: str) -> Optional[dict]:
-    """
-    Parse a JSON object that may be cut off mid-generation (no closing brace,
-    or an unterminated string). Returns the parsed dict, or None if even after
-    repair it cannot be parsed.
-    """
+    """Parse a JSON object that may be cut off mid-generation (no closing brace, or an unterminated string)."""
     e = candidate.rfind('}')
     if e != -1:
         try:

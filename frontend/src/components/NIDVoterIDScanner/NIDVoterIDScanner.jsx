@@ -120,7 +120,7 @@ const NIDVoterIDScanner = () => {
             </div>
 
             <div className="nid-content">
-                {/* Upload card */}
+                
                 <div className="nid-card glass">
                     <form onSubmit={handleSubmit}>
                         <div
@@ -192,7 +192,6 @@ const NIDVoterIDScanner = () => {
                     </form>
                 </div>
 
-                {/* Result card */}
                 {result && (
                     <div className={`nid-result-card glass ${result.id_valid ? 'result-valid' : 'result-partial'}`}>
                         <div className="nid-result-top">
@@ -263,7 +262,6 @@ const NIDVoterIDScanner = () => {
                     </div>
                 )}
 
-                {/* Supported countries info */}
                 <div className="nid-info-card glass">
                     <h3 className="nid-info-title">Supported Countries &amp; Formats</h3>
                     <div className="nid-country-grid">

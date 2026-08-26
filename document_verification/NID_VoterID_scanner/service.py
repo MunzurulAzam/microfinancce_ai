@@ -7,19 +7,7 @@ from document_verification.NID_VoterID_scanner.country_patterns import (
 
 
 def scan_id_card(image_path: str) -> dict:
-    """
-    Orchestrates the full NID/VoterID scan pipeline:
-      1. Preprocess image (crop, enhance, resize to 1600px)
-      2. Extract name + ID number via vision model (Claude or Ollama)
-      3. Detect country from extracted hint text (keyword scoring)
-      4. Validate extracted ID number against country-specific regex
-      5. Return unified result dict
-
-    Returns:
-      success=True:  { success, data: { name, id_number, id_valid, country,
-                        country_code, id_type, confidence, extractor, raw_text_sample } }
-      success=False: { success, data: None, error: str }
-    """
+    """Full scan pipeline: preprocess, vision extract, detect country, validate ID number."""
     preprocessed_path = None
     try:
         preprocessed_path = preprocess_id_image(image_path)

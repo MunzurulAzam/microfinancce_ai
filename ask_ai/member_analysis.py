@@ -7,18 +7,15 @@ from datetime import date, datetime
 from credit_scoring.scoring import calculate_credit_score
 from ask_ai import db, llm
 
-# Fallback base loan amount for a first-time borrower — no prior loan to scale from.
 FIRST_CYCLE_BASE = float(os.environ.get('ASK_AI_FIRST_CYCLE_BASE', 0))
 
 ANALYSIS_MODEL = os.environ.get('ASK_AI_ANALYSIS_MODEL') or None
 
 
-# small query helpers — all SQL here is hand-written and parameterized
 def _rows(sql, params=()):
     try:
         return db.query(sql, tuple(params))
     except db.QueryError as e:
-        # An empty result silently deflates the credit score, so make it visible.
         print(f"[ask_ai.member_analysis] query failed: {e}")
         return []
 
@@ -28,7 +25,6 @@ def _one(sql, params=()):
     return rows[0] if rows else None
 
 
-# pull the member reference code / id / name out of a full question
 _STOPWORDS = re.compile(
     r'(?i)\b(how much|loan amount|analyze|analyse|member|members|client|customer|can|could|'
     r'give|given|gives|get|gets|getting|a|an|the|to|for|of|is|are|eligible|eligibility|'
@@ -43,19 +39,15 @@ def extract_member_ref(question):
     m = re.search(r'\bCLN\d+\b', question, re.IGNORECASE)
     if m:
         return m.group(0)
-    m = re.search(r'\b\d{3,}\b', question)          # a member id (3+ digits)
+    m = re.search(r'\b\d{3,}\b', question)
     if m:
         return m.group(0)
     cleaned = _STOPWORDS.sub(' ', question)
-    cleaned = re.sub(r'[^\w\s]', ' ', cleaned)      # drop punctuation
+    cleaned = re.sub(r'[^\w\s]', ' ', cleaned)
     return ' '.join(cleaned.split()).strip()
 
 
-#  resolve member
-# MemberId and MemberCode are only unique WITHIN a country — 113k+ codes are
-# reused across the four countries — so a lookup without a country filter can
-# return several people. Rank the live, most recent record first rather than
-# letting the server's row order decide which person gets assessed.
+# MemberId/MemberCode are unique only within a country — 113k+ codes are reused.
 _BEST_FIRST = ("ORDER BY CASE WHEN MemberStatus = 'Active' THEN 0 "
                "WHEN MemberStatus = 'Inactive' THEN 1 ELSE 2 END, "
                "AdmissionDate DESC")
@@ -80,7 +72,6 @@ def resolve_member(query, country=None):
             f"SELECT * FROM MfMember WHERE MemberCode = %s{where_country} {_BEST_FIRST}",
             [q] + cp)
 
-    # Name search — every token must appear somewhere in "FirstName LastName".
     parts = [p for p in q.split() if len(p) > 1]
     if parts:
         conds = " AND ".join(["(FirstName + ' ' + LastName) LIKE %s"] * len(parts))
@@ -102,7 +93,6 @@ def suggest_members(query, country=None, limit=5):
         return []
     where_country = " AND CountryCode = %s" if country else ""
     cp = [country.upper()] if country else []
-    # Match on ANY token (loose).
     ors = " OR ".join(["(FirstName + ' ' + LastName) LIKE %s"] * len(tokens))
     rows = _rows(
         f"SELECT TOP (%s) FirstName, LastName, MemberCode, CountryCode FROM MfMember "
@@ -112,7 +102,6 @@ def suggest_members(query, country=None, limit=5):
             for r in rows]
 
 
-#  build the scoring `data` dict from DW
 def _age(dob):
     if not dob:
         return None
@@ -208,7 +197,6 @@ def build_scoring_data(member):
     }
 
 
-#  condition from loan + transaction history
 def assess_condition(data):
     total = data.get('total_collections', 0)
     overdue = data.get('overdue_collections', 0)
@@ -237,7 +225,6 @@ def assess_condition(data):
     }
 
 
-#  recommended loan amount (deterministic)
 _MULT = {'Excellent': 1.5, 'Good': 1.25, 'Moderate Risk': 1.0, 'High Risk': 0.5}
 
 
@@ -282,8 +269,7 @@ def _decision(classification):
 
 
 def _suggestions(score_result, condition):
-    """Deterministic, actionable suggestions from the weak scoring parameters —
-    available even when the LLM is unavailable or weak."""
+    """Deterministic suggestions from the weak scoring parameters — works without the LLM."""
     tips = []
     for d in score_result['client_scoring']['details']:
         if d['score'] <= 2:
@@ -315,14 +301,12 @@ suggested amount, and give 2-3 concrete suggestions to reduce risk."""
     result = llm.generate(prompt, model=ANALYSIS_MODEL, temperature=0.5, num_predict=400)
     if result['success'] and result['text']:
         return result['text'].strip()
-    # Deterministic fallback if the model is unavailable.
     return (f"{score_result['member_name']} is {score_result['classification']} "
             f"({score_result['percentage']}%). {condition['summary']} "
             f"Decision: {_decision(score_result['classification'])}. "
             f"Suggested amount: {amount['recommended_amount']:,.0f}.")
 
 
-# public entry point
 def analyze_member(query, country=None):
     ref = extract_member_ref(query)
     matches = resolve_member(ref, country)
@@ -350,8 +334,7 @@ def analyze_member(query, country=None):
               f"({m.get('MemberCode','')}, {m.get('CountryCode','')})".strip()
               for m in matches[1:5]]
 
-    # The same code exists in more than one country — say so, rather than let the
-    # reader assume the assessment is about the person they had in mind.
+    # The same code exists in more than one country — say so, never assume.
     countries = {m.get('CountryCode') for m in matches}
     ambiguous = len(countries) > 1
 

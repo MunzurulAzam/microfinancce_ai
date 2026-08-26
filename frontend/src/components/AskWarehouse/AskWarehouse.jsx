@@ -47,8 +47,7 @@ const AskWarehouse = () => {
         setShowSql(false);
 
         try {
-            // The country chip is enforced server-side as a real CountryCode
-            // filter, so the question text is sent exactly as typed.
+            // The country chip is enforced server-side, so the question goes as typed.
             const data = await askWarehouse(input.trim(), {
                 country: country === 'ALL' ? null : country,
             });
@@ -70,7 +69,7 @@ const AskWarehouse = () => {
 
     return (
         <div className="wq-container">
-            {/* Header */}
+            
             <div className="wq-header">
                 <div className="wq-header-icon"><Database size={24} /></div>
                 <div>
@@ -82,7 +81,6 @@ const AskWarehouse = () => {
                 </div>
             </div>
 
-            {/* Form */}
             <form onSubmit={submit} className="wq-form">
                 <div className="wq-input-row">
                     <input
@@ -98,7 +96,6 @@ const AskWarehouse = () => {
                     </Button>
                 </div>
 
-                {/* Country chips */}
                 <div className="wq-chips">
                     <Globe size={15} className="wq-chips-icon" />
                     {COUNTRIES.map((c) => (
@@ -115,7 +112,6 @@ const AskWarehouse = () => {
                 </div>
             </form>
 
-            {/* Examples (only before first result) */}
             {!result && !error && !loading && (
                 <div className="wq-examples">
                     <span className="wq-examples-label">Try:</span>
@@ -127,7 +123,6 @@ const AskWarehouse = () => {
                 </div>
             )}
 
-            {/* Loading */}
             {loading && (
                 <div className="wq-loading">
                     <div className="wq-typing"><span /><span /><span /></div>
@@ -135,7 +130,6 @@ const AskWarehouse = () => {
                 </div>
             )}
 
-            {/* Error */}
             {error && !loading && (
                 <div className="wq-error">
                     <AlertCircle size={18} />
@@ -151,12 +145,10 @@ const AskWarehouse = () => {
                 </div>
             )}
 
-            {/* Member analysis result */}
             {result && !loading && result.mode === 'member_analysis' && (
                 <MemberAnalysisCard r={result} />
             )}
 
-            {/* SQL result */}
             {result && !loading && result.mode !== 'member_analysis' && (
                 <div className="wq-result">
                     {result.answer && (
@@ -166,8 +158,7 @@ const AskWarehouse = () => {
                         </div>
                     )}
 
-                    {/* The country chip could not be confirmed in the SQL — say so
-                        rather than let the numbers read as scoped when they may not be. */}
+                    {/* Unconfirmed country scope — say so rather than let the numbers read as scoped. */}
                     {result.country_enforced === false && (
                         <div className="ma-note">
                             <AlertCircle size={14} />
@@ -175,7 +166,6 @@ const AskWarehouse = () => {
                         </div>
                     )}
 
-                    {/* Collapsible SQL */}
                     {result.sql && (
                         <div className="wq-sql-block">
                             <button className="wq-sql-toggle" onClick={() => setShowSql((s) => !s)}>
@@ -187,7 +177,6 @@ const AskWarehouse = () => {
                         </div>
                     )}
 
-                    {/* Results table */}
                     <ResultTable
                         columns={result.columns}
                         rows={result.rows}
@@ -218,7 +207,7 @@ const MemberAnalysisCard = ({ r }) => {
 
     return (
         <div className="ma-card">
-            {/* Header */}
+            
             <div className="ma-head">
                 <div>
                     <div className="ma-name">{r.member?.name}</div>
@@ -231,7 +220,6 @@ const MemberAnalysisCard = ({ r }) => {
                 </div>
             </div>
 
-            {/* Stat tiles */}
             <div className="ma-stats">
                 <div className="ma-stat">
                     <span className="ma-stat-label">Credit Score</span>
@@ -249,7 +237,6 @@ const MemberAnalysisCard = ({ r }) => {
                 </div>
             </div>
 
-            {/* AI analysis */}
             {r.analysis && (
                 <div className="ma-analysis">
                     <div className="ma-analysis-head"><Database size={15} /> Analysis</div>
@@ -257,7 +244,6 @@ const MemberAnalysisCard = ({ r }) => {
                 </div>
             )}
 
-            {/* Suggestions */}
             {r.suggestions?.length > 0 && (
                 <div className="ma-suggest">
                     <div className="ma-analysis-head"><Lightbulb size={15} /> Suggestions</div>
@@ -265,8 +251,7 @@ const MemberAnalysisCard = ({ r }) => {
                 </div>
             )}
 
-            {/* Member codes repeat across countries — never let the reader assume
-                this is the person they meant. */}
+            {/* Member codes repeat across countries — never let the reader assume the person. */}
             {r.match_note && (
                 <div className="ma-note">
                     <AlertCircle size={14} /> {r.match_note}

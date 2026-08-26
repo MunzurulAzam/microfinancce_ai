@@ -20,7 +20,6 @@ def ask_ai_endpoint():
             'example': {'question': 'Total loan portfolio across all countries?'},
         }), 400
 
-    # Country scope (UG/KY/ZM/TZ). Absent or 'ALL' means all four countries.
     country = (data.get('country') or '').strip().upper() or None
     if country == 'ALL':
         country = None
@@ -31,14 +30,11 @@ def ask_ai_endpoint():
                      f'{", ".join(COUNTRY_CODES)}, or omit for all countries.',
         }), 400
 
-    # Set summary=false for the fastest response (raw table only, no NL phrasing).
     with_summary = bool(data.get('summary', True))
 
-    # Router picks: member analysis (score + decision + amount) OR text-to-SQL.
     result = route(question, country=country, with_summary=with_summary)
 
     if result.get('success'):
         return jsonify(result), 200
-    # A question we could not turn into valid SQL is the caller's input problem,
-    # not a server fault — only genuine failures should read as 500.
+    # An untranslatable question is the caller's problem — only real faults are 500.
     return jsonify(result), (400 if result.get('bad_request') else 500)

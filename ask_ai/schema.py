@@ -6,8 +6,7 @@ from ask_ai.config import (
     TABLE_ALLOWLIST, HIDDEN_COLUMNS, HIDDEN_COLUMN_SUFFIXES, SCHEMA_CACHE_TTL,
 )
 
-# The schema is read once and reused: introspecting per request would add a
-# round-trip to every question for data that changes maybe once a release.
+
 _cache = TTLCache(SCHEMA_CACHE_TTL, max_entries=4)
 _KEY = 'dbo'
 
@@ -53,11 +52,7 @@ _COUNTRY_KEY = 'country_ids'
 
 
 def country_ids():
-    """{'KY': 1, 'TZ': 2, ...} read from DW, not hardcoded.
-
-    The guard needs it to recognise `WHERE CountryId = 1` as a valid Kenya
-    filter. Cached like the schema — it changes only when a country is added.
-    """
+    """{'KY': 1, 'TZ': 2, ...} read from DW, not hardcoded."""
     ids = _cache.get(_COUNTRY_KEY)
     if ids is None:
         rows = db.query(
@@ -70,13 +65,7 @@ def country_ids():
 
 
 def tables_with_column(column):
-    """Every allowlisted table that actually has this column.
 
-    Used to repair "Invalid column name 'X'": the model guessed a column onto
-    the wrong table (MfMember.BranchId is the common one), and naming the tables
-    that really do have it is the single fact it needs. Free — the schema is
-    already cached in memory.
-    """
     target = column.lower()
     return [table for table, cols in get_columns().items()
             if any(name.lower() == target for name, _ in cols)]
@@ -98,8 +87,7 @@ def get_schema_text(tables=None):
 
 
 def warm():
-    """Populate the cache at startup so the first question doesn't pay for it.
-    Never fatal — a DW outage must not stop the app from booting."""
+    """Populate the cache at startup so the first question doesn't pay for it."""
     try:
         get_columns()
         return True

@@ -18,7 +18,7 @@ const ChatInterface = () => {
     useEffect(scrollToBottom, [messages]);
 
     useEffect(() => {
-        // Welcome message
+        
         setMessages([{
             type: 'ai',
             content: 'Hello! I can help you analyze your microfinance data. Ask me anything!\n\nExamples:\n• Credit score for [client name]\n• Show me statistics\n• Analyze client John Doe\n• Show top clients\n• Risk analysis',
@@ -78,7 +78,6 @@ const ChatInterface = () => {
         setInput(action.question);
     };
 
-    // ── Rich score card rendering ──
     const renderScoreCard = (data) => {
         if (!data) return null;
 
@@ -104,7 +103,7 @@ const ChatInterface = () => {
 
         return (
             <div className="score-card">
-                {/* Header */}
+                
                 <div className="score-card-header">
                     <div className="score-card-title">
                         <Shield size={20} />
@@ -115,7 +114,6 @@ const ChatInterface = () => {
                     </div>
                 </div>
 
-                {/* Gauge */}
                 <div className="score-gauge-section">
                     <div className="score-gauge" style={{ '--score-color': color }}>
                         <svg viewBox="0 0 120 120" className="gauge-svg">
@@ -138,7 +136,6 @@ const ChatInterface = () => {
                     <div className="score-total">{total_score} / {max_score} points</div>
                 </div>
 
-                {/* Category Breakdown */}
                 <div className="score-categories">
                     {[
                         { label: '📋 Client Scoring', data: client_scoring },
@@ -149,7 +146,6 @@ const ChatInterface = () => {
                     ))}
                 </div>
 
-                {/* AI Analysis */}
                 {ai_analysis && (
                     <div className="score-ai-section">
                         <div className="score-ai-header">AI Analysis</div>
@@ -247,8 +243,6 @@ const ChatInterface = () => {
     );
 };
 
-
-// ── Score Category Component ──
 const ScoreCategory = ({ label, catData, sub }) => {
     const [expanded, setExpanded] = useState(false);
     if (!catData) return null;
