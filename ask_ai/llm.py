@@ -1,74 +1,7 @@
+from core.cloud import generate as cloud_generate
 
-import time
-
-import requests
-
-from ask_ai.config import OLLAMA_BASE_URL, ASK_AI_MODEL, OLLAMA_KEEP_ALIVE
-
-# A cold model, or a cloud tag under load, briefly returns 429/503.
-_RETRY_STATUSES = {429, 503}
-_MAX_RETRIES = 3
-_RETRY_BACKOFF_SEC = 4
-
-
-def generate(prompt, *, model=None, temperature=0.0, num_predict=400, timeout=120):
-
-    model = model or ASK_AI_MODEL
-    payload = {
-        'model': model,
-        'prompt': prompt,
-        'stream': False,
-        'keep_alive': OLLAMA_KEEP_ALIVE,
-        'options': {'temperature': temperature, 'num_predict': num_predict},
-    }
-
-    last_error = None
-    for attempt in range(_MAX_RETRIES):
-        try:
-            resp = requests.post(
-                f'{OLLAMA_BASE_URL}/api/generate', json=payload, timeout=timeout,
-            )
-        except requests.exceptions.ConnectionError:
-            return _fail(
-                f'Ollama is not running at {OLLAMA_BASE_URL}. Start it, then run: '
-                f'ollama pull {model}{_cloud_hint(model)}',
-                unavailable=True,
-            )
-        except requests.exceptions.Timeout:
-            return _fail(
-                f'The model took longer than {timeout}s to respond '
-                '(it may still be loading).',
-                unavailable=True,
-            )
-
-        if resp.status_code == 200:
-            return {'success': True, 'text': resp.json().get('response', ''), 'error': None}
-
-        body = resp.text[:400]
-        if resp.status_code == 404 or 'not found' in body.lower():
-            return _fail(
-                f'Model "{model}" is not available. '
-                f'Run: ollama pull {model}{_cloud_hint(model)}',
-                unavailable=True,
-            )
-
-        last_error = f'[{model}] Ollama HTTP {resp.status_code}: {body}'
-        if resp.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES - 1:
-            time.sleep(_RETRY_BACKOFF_SEC * (attempt + 1))
-            continue
-        return _fail(last_error)
-
-    return _fail(last_error)
-
-
-def _fail(error, unavailable=False):
-    return {'success': False, 'text': None, 'error': error, 'unavailable': unavailable}
-
-
-def _cloud_hint(model):
-    if model.endswith('-cloud') or model.endswith(':cloud'):
-        return ' (cloud model — also run `ollama signin` once)'
-    return ''
+def generate(prompt, **kwargs):
+    return cloud_generate(prompt, task="sql", **kwargs)
 
 
 def summarize(question, columns, rows, *, timeout=60):

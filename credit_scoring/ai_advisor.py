@@ -1,38 +1,9 @@
-import requests
-import json
-from config import Config
+from core.cloud import generate
 
 
 def get_ai_analysis(score_result):
-    try:
-        prompt = _build_prompt(score_result)
-        response = requests.post(
-            f"{Config.OLLAMA_BASE_URL}/api/generate",
-            json={
-                'model': Config.OLLAMA_MODEL,
-                'prompt': prompt,
-                'stream': False,
-                'options': {
-                    'temperature': 0.7,
-                    'num_predict': 500,
-                }
-            },
-            timeout=60
-        )
-
-        if response.status_code == 200:
-            result = response.json()
-            return result.get('response', '').strip()
-        else:
-            print(f"Ollama returned status {response.status_code}")
-            return _fallback_analysis(score_result)
-
-    except requests.exceptions.ConnectionError:
-        print("Ollama not available, using fallback analysis")
-        return _fallback_analysis(score_result)
-    except Exception as e:
-        print(f"Ollama error: {e}")
-        return _fallback_analysis(score_result)
+    result = generate(_build_prompt(score_result), task='text', temperature=0.1)
+    return result['text'] if result['success'] else _fallback_analysis(score_result)
 
 
 def _build_prompt(score_result):

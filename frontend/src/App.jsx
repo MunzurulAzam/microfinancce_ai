@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout/Layout';
-import ChatInterface from './components/Ask/ChatInterface';
-import AskWarehouse from './components/AskWarehouse/AskWarehouse';
+import Workspace from './chat/Workspace';
 import FileUpload from './components/Upload/FileUpload';
 import Dashboard from './components/Dashboard/Dashboard';
 import EvaluationForm from './components/Evaluation/EvaluationForm';
@@ -14,8 +13,9 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout />}>
-          <Route index element={<ChatInterface />} />
-          <Route path="ask-ai" element={<AskWarehouse />} />
+          <Route index element={<Workspace />} />
+          <Route path="chat/:id" element={<Workspace />} />
+          <Route path="ask-ai" element={<Workspace />} />
           <Route path="upload" element={<FileUpload />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="evaluation" element={<EvaluationForm />} />

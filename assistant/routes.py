@@ -427,9 +427,9 @@ def _format_credit_score_text(sr):
 def ask_endpoint():
     """POST /api/ask — {"question": str} in, natural-language answer out."""
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
 
-        if not data or 'question' not in data:
+        if not isinstance(data, dict) or 'question' not in data:
             return jsonify({
                 'success': False,
                 'answer': 'Please provide the "question" field.',
@@ -437,6 +437,23 @@ def ask_endpoint():
             }), 400
 
         question = data['question']
+        if not isinstance(question, str) or not question.strip():
+            return jsonify({'success': False, 'error': 'question must be a nonempty string.'}), 400
+        from core.conversation import resolve, attach, ContextError
+        try:
+            question, effective_country, context_response = resolve(question, data.get('context'), data.get('country'))
+        except ContextError as error:
+            return jsonify({'success': False, 'code': 'invalid_context', 'error': str(error)}), 400
+        if context_response is not None:
+            return jsonify(attach(context_response, question, effective_country)), 200
+        from reports.service import REPORT_NAMES
+        if REPORT_NAMES.search(question) or effective_country not in (None, 'ALL'):
+            from ask_ai.engine import route
+            if not isinstance(data.get('summary', True), bool):
+                return jsonify({'success': False, 'error': 'summary must be a boolean.'}), 400
+            result = route(question, country=effective_country, with_summary=data.get('summary', True))
+            result = attach(result, question, effective_country)
+            return jsonify(result), (200 if result.get('success') else result.get('http_status', 500))
 
         intent, entity = parse_question(question)
 
@@ -452,7 +469,7 @@ def ask_endpoint():
         if entity:
             response['entity'] = entity
 
-        return jsonify(response), 200
+        return jsonify(attach(response, question, effective_country)), 200
 
     except Exception as e:
         return jsonify({

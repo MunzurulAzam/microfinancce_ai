@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
-load_dotenv()
+from pathlib import Path
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from flask import Flask, jsonify, request
 from config import Config
@@ -8,7 +9,9 @@ from assistant import ask_bp
 from evaluation import evaluation_bp
 from document_verification import doc_verify_bp
 from document_verification.NID_VoterID_scanner import nid_scanner_bp
+from reports.api import reports_bp
 from ask_ai.api import ask_ai_bp
+from ask_ai.dify import dify_kb_bp
 
 
 def create_app(config_class=Config):
@@ -17,6 +20,10 @@ def create_app(config_class=Config):
     app.config.from_object(config_class)
     
     config_class.init_app(app)
+    from core.cloud import configuration_status
+    cloud_status = configuration_status()
+    if not cloud_status['configured']:
+        app.logger.warning('Ollama Cloud configuration unavailable (%s); warehouse AI SQL requires server setup. Fixed reports remain available.', cloud_status['code'])
 
     allowed_origins = config_class.CORS_ORIGINS
     print(f"CORS ALLOWED ORIGINS: {allowed_origins}")
@@ -50,6 +57,8 @@ def create_app(config_class=Config):
     app.register_blueprint(doc_verify_bp, url_prefix='/api')
     app.register_blueprint(nid_scanner_bp, url_prefix='/api')
     app.register_blueprint(ask_ai_bp, url_prefix='/api')
+    app.register_blueprint(reports_bp, url_prefix='/api')
+    app.register_blueprint(dify_kb_bp, url_prefix='/api')
 
     from ask_ai import schema as ask_ai_schema
     ask_ai_schema.warm()
@@ -83,7 +92,8 @@ def create_app(config_class=Config):
                     'POST /api/scan-id': 'Scan NID/VoterID card — extracts name + ID number (JPEG/PNG/WebP)'
                 },
                 'ask_ai': {
-                    'POST /api/ask-ai': 'Natural-language Q&A over the DW warehouse, all 4 countries (UG/KY/ZM/TZ) — text-to-SQL'
+                    'POST /api/ask-ai': 'Natural-language Q&A over the DW warehouse, all 4 countries (UG/KY/ZM/TZ) — text-to-SQL',
+                    'POST /api/dify/retrieval': 'Dify external knowledge API (knowledge_id: dw-live | dw-schema)'
                 }
             },
             'documentation': 'See README.md for detailed API documentation'
@@ -93,7 +103,8 @@ def create_app(config_class=Config):
     def health():
         return jsonify({
             'status': 'healthy',
-            'service': 'Microfinance AI API'
+            'service': 'Microfinance AI API',
+            'cloud': configuration_status()
         })
     
     @app.errorhandler(404)

@@ -1,117 +1,18 @@
-import os
-from config import Config
+from core.cloud import generate
 
 
 class LlamaHandler:
-    
-    def __init__(self):
-        self.llm = None
-        self.model_loaded = False
-        
-        if Config.USE_AI_MODEL:
-            self._load_model()
-    
-    def _load_model(self):
-        try:
-            if not os.path.exists(Config.MODEL_PATH):
-                print(f"⚠️  Model not found at {Config.MODEL_PATH}")
-                print(f"📥 Please download the model from:")
-                print(f"   {Config.MODEL_URL}")
-                print(f"   Save it as: {Config.MODEL_PATH}")
-                print("💡 API will use fallback analysis without AI model")
-                self.model_loaded = False
-                return
-            
-            from llama_cpp import Llama
-            
-            print("🔄 Loading Llama model...")
-            self.llm = Llama(
-                model_path=Config.MODEL_PATH,
-                n_ctx=Config.MODEL_N_CTX,
-                n_threads=Config.MODEL_N_THREADS,
-                verbose=False
-            )
-            self.model_loaded = True
-            print("✅ Llama model loaded successfully!")
-            
-        except ImportError:
-            print("⚠️  llama-cpp-python not installed")
-            print("💡 Install with: pip install llama-cpp-python")
-            print("💡 API will use fallback analysis")
-            self.model_loaded = False
-        except Exception as e:
-            print(f"⚠️  Error loading model: {e}")
-            print("💡 API will use fallback analysis")
-            self.model_loaded = False
-    
+    """Compatibility facade for existing portfolio and assistant callers."""
     def analyze_with_ai(self, prompt, context):
-        if self.model_loaded and self.llm:
-            return self._ai_analysis(prompt, context)
-        else:
-            return self._fallback_analysis(prompt, context)
-            
+        result = generate(f"Use only these supplied facts; do not invent numbers.\nDATA: {context}\nQuestion: {prompt}", task='text')
+        return result['text'] if result['success'] else self._fallback_analysis(prompt, context)
+
     def get_intent_ai(self, question):
-        if not self.model_loaded or not self.llm:
-            return None
-            
-        system_prompt = """
-Classify the following microfinance question into one of these intents:
-- stats: Overall portfolio balance, count of clients/groups
-- insights: Highlights and quick summary
-- top_clients: Best performing individual clients
-- top_groups: Best performing groups
-- risk_analysis: Problems, overdue, defaults, high risk
-- analyze_client: Detailed info about a specific person
-- analyze_group: Detailed info about a specific group
-- business_performance: Performance by business type or sector
-- general: Any other question or help
+        allowed = ['stats', 'insights', 'top_clients', 'top_groups', 'risk_analysis', 'analyze_client', 'analyze_group', 'business_performance']
+        result = generate(f"Return only one intent from {allowed}, or general. Question: {question}", num_predict=40)
+        intent = (result.get('text') or '').lower()
+        return intent if intent in allowed else None
 
-Respond ONLY with the intent name and nothing else.
-Question: """
-        
-        try:
-            response = self.llm(
-                f"{system_prompt}{question}",
-                max_tokens=10,
-                temperature=0.1,
-                echo=False
-            )
-            intent = response['choices'][0]['text'].strip().lower()
-            return intent if intent in ['stats', 'insights', 'top_clients', 'top_groups', 'risk_analysis', 'analyze_client', 'analyze_group', 'business_performance'] else None
-        except:
-            return None
-    
-    def _ai_analysis(self, prompt, context):
-        full_prompt = f"""
-You are a friendly microfinance analyst assistant. You're helping a loan officer understand their portfolio.
-
-DATA:
-{context}
-
-QUESTION: {prompt}
-
-Please provide a helpful, conversational analysis with:
-- Key observations in simple terms
-- What's working well
-- Areas for improvement
-- Specific, actionable recommendations
-- Keep it friendly and encouraging
-
-Answer in a natural, conversational tone:
-"""
-        
-        try:
-            response = self.llm(
-                full_prompt,
-                max_tokens=Config.MODEL_MAX_TOKENS,
-                temperature=Config.MODEL_TEMPERATURE,
-                echo=False
-            )
-            return response['choices'][0]['text'].strip()
-        except Exception as e:
-            print(f"AI analysis error: {e}")
-            return self._fallback_analysis(prompt, context)
-    
     def _fallback_analysis(self, prompt, context):
         
         if "CLIENT ANALYSIS" in context:

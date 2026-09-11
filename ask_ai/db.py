@@ -38,16 +38,19 @@ class _Pool:
                 'DW_PASSWORD is not set. Copy .env.example to .env and fill in the '
                 'DW_* credentials.'
             )
-        conn = pymssql.connect(
-            server=DW_SERVER,
-            port=DW_PORT,
-            user=DW_USER,
-            password=DW_PASSWORD,
-            database=DW_DATABASE,
-            timeout=QUERY_TIMEOUT,
-            login_timeout=LOGIN_TIMEOUT,
-            as_dict=False,
-        )
+        try:
+            conn = pymssql.connect(
+                server=DW_SERVER,
+                port=DW_PORT,
+                user=DW_USER,
+                password=DW_PASSWORD,
+                database=DW_DATABASE,
+                timeout=QUERY_TIMEOUT,
+                login_timeout=LOGIN_TIMEOUT,
+                as_dict=False,
+            )
+        except pymssql.Error as error:
+            raise QueryError("Warehouse connection unavailable.") from error
         cur = conn.cursor()
         # Read uncommitted so an analytical scan never blocks a production writer.
         cur.execute(

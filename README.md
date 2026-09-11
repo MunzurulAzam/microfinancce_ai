@@ -8,7 +8,7 @@ A Flask-based REST API that provides microfinance client and group analysis with
 - **Client Analysis**: Analyze individual client performance
 - **Group Analysis**: View collective group performance
 - **Conversational AI**: Ask natural language questions via `/api/ask`
-- **AI-Powered Insights**: Smart recommendations using the TinyLlama model
+- **AI-Powered Insights**: Smart recommendations using Ollama Cloud
 - **Risk Assessment**: Identify high-risk clients and groups
 - **Performance Metrics**: Business sector analysis and top performers
 
@@ -34,17 +34,10 @@ source env/bin/activate  # Mac/Linux
 pip install -r requirements.txt
 ```
 
-### 3. Download AI Model (Optional)
+### 3. Configure Ollama Cloud
 
-Download the TinyLlama model for AI analysis:
-
-```bash
-cd models
-wget -O llama-model.gguf https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
-cd ..
-```
-
-**Note**: The API will use a built-in fallback analysis system if the model is not found.
+Copy `.env.example` to `.env`, fill warehouse credentials and `OLLAMA_API_KEY`.
+All inference uses the cloud directly; no local model download is required.
 
 ## 🏃 Run the Application
 
@@ -52,7 +45,7 @@ cd ..
 python app.py
 ```
 
-The API will be available at: `http://localhost:5000`
+The API will be available at: `http://localhost:5001`
 
 ## 📡 API Endpoints
 
@@ -76,7 +69,7 @@ POST /api/upload
 Content-Type: multipart/form-data
 
 # Example with curl:
-curl -X POST http://localhost:5000/api/upload \
+curl -X POST http://localhost:5001/api/upload \
   -F "file=@data/master_data.csv"
 ```
 
@@ -146,11 +139,13 @@ ai/
     └── uploads/               # Uploaded CSV files
 ```
 
-## 🤖 AI Model
+## AI Models and Reports
 
-- **Model**: TinyLlama-1.1B-Chat (Q4_K_M quantized)
-- **Size**: ~637MB
-- **Fallback**: Intelligent rule-based analysis if the model is unavailable
+- Qwen 3.5 397B: text, SQL and report evidence selection.
+- MiniMax M3: document vision.
+- Ask **Group Performance Report August 2026** in Ask AI for preview and PDF.
+- [Report API, source definitions and .NET integration](docs/report-api.md).
+- Cloud failures preserve deterministic report tables and existing scoring logic.
 
 ## ⚠️ Important Notes
 
@@ -161,3 +156,7 @@ ai/
 ## 📄 License
 
 MIT License
+
+### Persistent chat workspace
+
+Ask AI and Data Q&A now share browser-local conversations with follow-ups. See [chat storage, context API and .NET forwarding](docs/chat-workspace.md) for the contract, browser limitations and test commands.

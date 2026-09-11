@@ -10,7 +10,7 @@ from ask_ai import db                            # noqa: E402  (must follow load
 from ask_ai.engine import is_member_analysis     # noqa: E402
 from ask_ai.glossary import EXAMPLES             # noqa: E402
 from ask_ai.sql_guard import (                   # noqa: E402
-    has_country_filter, sanitize, UnsafeSQL,
+    has_country_filter, sanitize, scope_to_country, UnsafeSQL,
 )
 
 ROUTING_CASES = [
@@ -72,6 +72,73 @@ def check_country_guard():
     return failures
 
 
+SCOPE_CASES = [
+    ("SELECT COUNT(*) FROM MfMember m JOIN MfLoan l ON l.MemberId = m.MemberId "
+     "WHERE m.CountryCode = 'KY'", ['MfMember', 'MfLoan']),
+    ("SELECT COUNT(*) FROM MfLoan WHERE CountryCode = 'KY' OR TotalOutstanding > 1000",
+     ['MfLoan']),
+    ("SELECT SUM(CASE WHEN CountryCode = 'KY' THEN 1 ELSE 0 END) AS n FROM MfMember",
+     ['MfMember']),
+    ("SELECT SUM(l.TotalOutstanding) FROM MfLoan l WHERE l.MemberId IN "
+     "(SELECT MemberId FROM MfMember)", ['MfLoan', 'MfMember']),
+    ("WITH ky AS (SELECT MemberId FROM MfMember) SELECT COUNT(*) FROM ky", ['MfMember']),
+    ("SELECT COUNT(*) FROM MfMember", ['MfMember']),
+    ("SELECT COUNT(*) FROM dbo.MfMember AS m", ['MfMember']),
+    ("SELECT COUNT(*) FROM [MfMember] m", ['MfMember']),
+    ("SELECT COUNT(*) FROM MfMember m, MfLoan l WHERE l.MemberId = m.MemberId",
+     ['MfMember', 'MfLoan']),
+    ("SELECT b.BranchName FROM MfMember m JOIN MfGroup g ON g.GroupId = m.GroupId "
+     "JOIN AdBranch b ON b.BranchId = g.BranchId", ['MfMember', 'MfGroup', 'AdBranch']),
+    ("SELECT COUNT(*) FROM MfMember WHERE FirstName = 'FROM MfLoan x'", ['MfMember']),
+    ("SELECT COUNT(*) FROM DW.dbo.MfMember m", ['MfMember']),
+    ("SELECT COUNT(*) FROM [dbo].[MfMember] m", ['MfMember']),
+    ("SELECT COUNT(*) FROM MfMember m LEFT OUTER JOIN MfLoan l "
+     "ON l.MemberId = m.MemberId", ['MfMember', 'MfLoan']),
+    ("SELECT COUNT(*) FROM MfMember UNION ALL SELECT COUNT(*) FROM MfLoan",
+     ['MfMember', 'MfLoan']),
+    ("WITH a AS (SELECT * FROM MfMember), b AS (SELECT * FROM MfLoan) "
+     "SELECT COUNT(*) FROM a JOIN b ON b.MemberId = a.MemberId", ['MfMember', 'MfLoan']),
+    ("SELECT (SELECT COUNT(*) FROM MfLoan) AS n FROM MfMember", ['MfMember', 'MfLoan']),
+    ("SELECT * FROM MfLoan l CROSS APPLY (SELECT TOP 1 * FROM MfLoanCollection c "
+     "WHERE c.LoanId = l.LoanId) x", ['MfLoan', 'MfLoanCollection']),
+    ("SELECT COUNT(*) FROM MfMember /* FROM MfLoan */ m", ['MfMember']),
+]
+
+SCOPE_REJECTS = [
+    "SELECT COUNT(*) FROM SomeOtherTable t",
+    "SELECT COUNT(*) FROM MfMember m JOIN sys.objects o ON o.name = m.FirstName",
+    "WITH MfMember AS (SELECT * FROM MfMember) SELECT COUNT(*) FROM MfMember",
+]
+
+
+def check_country_scope():
+    """Every base table must come out wrapped in a country filter, or be rejected."""
+    failures = []
+    for sql, tables in SCOPE_CASES:
+        try:
+            scoped = scope_to_country(sql, 'KY')
+        except UnsafeSQL as e:
+            failures.append(sql)
+            print(f"FAIL scope    wrongly rejected: {sql}\n          {e}")
+            continue
+        for table in tables:
+            if f"(SELECT * FROM {table} WHERE CountryCode = 'KY')" not in scoped:
+                failures.append(sql)
+                print(f"FAIL scope    {table} left unscoped: {sql}\n          {scoped}")
+
+    for sql in SCOPE_REJECTS:
+        try:
+            scope_to_country(sql, 'KY')
+            failures.append(sql)
+            print(f"FAIL scope    should have been rejected: {sql}")
+        except UnsafeSQL:
+            pass
+
+    total = len(SCOPE_CASES) + len(SCOPE_REJECTS)
+    print(f"{total - len(failures)}/{total} country-scope cases correct")
+    return failures
+
+
 def check_routing():
     """Aggregate wording must never be mistaken for one person."""
     failures = []
@@ -119,7 +186,9 @@ def main():
 
     routing_failures = check_routing()
     country_failures = check_country_guard()
-    return 1 if (failures or routing_failures or country_failures) else 0
+    scope_failures = check_country_scope()
+    return 1 if (failures or routing_failures or country_failures
+                 or scope_failures) else 0
 
 
 if __name__ == '__main__':

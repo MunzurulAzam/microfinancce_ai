@@ -140,9 +140,11 @@ PRE-AGGREGATED REPORTING
   * Every other Matrix (e.g. 'Active Members Female', 'Number of Active Group',
     'Number of Branch', 'Add: Admission (this month)', 'UML') -> the value is in
     Nos. On these rows the PrincipalOS* columns are 0.
-  The columns TotalOutStanding, Principal, WithInterest and Amount are always 0
-  in this table — never select them. For an outstanding figure use MfLoan
-  (LoanStatus = 1) instead.
+  Matrix = 'Active Borrowers & Gross Loan Outstanding' has borrower counts
+  in Nos and historical principal outstanding in Principal; do not sum it with
+  per-product rows. Monetary columns on other Matrix rows have different
+  meanings and may be zero. MfLoan (LoanStatus = 1) is CURRENT balance only;
+  never use it to answer historical month-end balance questions.
   The most recent month is usually partial; exclude it for a clean trend.
 - MfPerformanceTrackerData: daily per officer/branch. BusinessDate, BranchId,
   LOName, BMName, AMName, NoOfNewAdmission, NoOfTotalDisburse,

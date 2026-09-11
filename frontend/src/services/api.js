@@ -10,22 +10,22 @@ const api = axios.create({
     withCredentials: false,   // must be false when backend uses wildcard/list origins
 });
 
-export const askQuestion = async (question) => {
+export const askQuestion = async (question, { country = null, context } = {}) => {
     try {
-        const response = await api.post('/ask', { question });
+        const response = await api.post('/ask', { question, country, context }, { timeout: 180000 });
         return response.data;
     } catch (error) {
         throw error.response?.data || error.message;
     }
 };
 
-export const askWarehouse = async (question, { country = null, summary = true } = {}) => {
+export const askWarehouse = async (question, { country = null, summary = true, context } = {}) => {
     try {
-        // SQL generation runs on a local CPU model — allow extra time.
+        // Includes bounded cloud inference and warehouse query time.
         const response = await api.post(
             '/ask-ai',
-            { question, summary, country },
-            { timeout: 90000 }
+            { question, summary, country, context },
+            { timeout: 180000 }
         );
         return response.data;
     } catch (error) {
@@ -182,4 +182,16 @@ export const evaluateApplicant = async (formData, pdfFile) => {
     }
 };
 
+export const downloadGroupReport = async (reportId) => {
+    const response = await api.get(`/reports/${reportId}/pdf`, { responseType: 'blob', timeout: 60000 });
+    return response.data;
+};
+
 export default api;
+
+export const getReportPeriods = async (country = 'ALL') => {
+    try {
+        const response = await api.get('/reports/group-performance/periods', { params: { country }, timeout: 60000 });
+        return response.data;
+    } catch (error) { throw error.response?.data || { error: error.message }; }
+};

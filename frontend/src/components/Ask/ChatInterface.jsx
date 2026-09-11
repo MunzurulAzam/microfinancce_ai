@@ -3,6 +3,7 @@ import { Send, Sparkles, BarChart3, TrendingUp, AlertCircle, Shield } from 'luci
 import { askQuestion } from '../../services/api';
 import Button from '../Common/Button';
 import Card from '../Common/Card';
+import GroupReport from '../AskWarehouse/GroupReport';
 import './ChatInterface.css';
 
 const ChatInterface = () => {
@@ -10,12 +11,12 @@ const ChatInterface = () => {
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef(null);
+    const reportStartRef = useRef(null);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
-
-    useEffect(scrollToBottom, [messages]);
+    useEffect(() => {
+        const target = messages.at(-1)?.report ? reportStartRef : messagesEndRef;
+        target.current?.scrollIntoView({ behavior: 'smooth', block: messages.at(-1)?.report ? 'start' : 'end' });
+    }, [messages]);
 
     useEffect(() => {
         
@@ -47,6 +48,7 @@ const ChatInterface = () => {
                 type: 'ai',
                 content: response.answer,
                 intent: response.intent,
+                report: response.report,
                 data: response.data,
                 creditScore: response.credit_score || false,
                 timestamp: new Date()
@@ -67,6 +69,7 @@ const ChatInterface = () => {
     };
 
     const quickActions = [
+        { label: 'Group Report', question: 'Group Performance Report', icon: BarChart3 },
         { label: 'Credit Score', question: 'Credit score for ', icon: Shield, autoFocus: true },
         { label: 'Show Statistics', question: 'Show me statistics', icon: BarChart3 },
         { label: 'Quick Insights', question: 'Show insights', icon: Sparkles },
@@ -170,9 +173,9 @@ const ChatInterface = () => {
 
             <div className="chat-messages">
                 {messages.map((message, index) => (
-                    <div key={index} className={`message message-${message.type}`}>
-                        <div className="message-bubble">
-                            {message.creditScore && message.data ? (
+                    <div key={index} ref={message.report ? reportStartRef : null} className={`message message-${message.type}`}>
+                        <div className={`message-bubble ${message.report ? 'message-report' : ''}`}>
+                            {message.report ? <GroupReport report={message.report} /> : message.creditScore && message.data ? (
                                 renderScoreCard(message.data)
                             ) : (
                                 <pre className="message-content">{message.content}</pre>

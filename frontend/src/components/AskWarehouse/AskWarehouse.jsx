@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Send, Database, Code2, ChevronDown, AlertCircle, Globe, CheckCircle2, XCircle, Lightbulb } from 'lucide-react';
 import { askWarehouse } from '../../services/api';
 import Button from '../Common/Button';
+import GroupReport from './GroupReport';
 import './AskWarehouse.css';
 
 // Country chips — "All" means no country filter (combined across all 4 countries).
@@ -14,6 +15,8 @@ const COUNTRIES = [
 ];
 
 const EXAMPLES = [
+    'Group Performance Report',
+    'Group Performance Report August 2026',
     'Total loan portfolio across all countries?',
     'How many active members in each country?',
     'Top 5 branches by active loan portfolio',
@@ -126,7 +129,7 @@ const AskWarehouse = () => {
             {loading && (
                 <div className="wq-loading">
                     <div className="wq-typing"><span /><span /><span /></div>
-                    <span>Generating SQL and querying the warehouse…</span>
+                    <span>Preparing your answer from the warehouse…</span>
                 </div>
             )}
 
@@ -149,7 +152,9 @@ const AskWarehouse = () => {
                 <MemberAnalysisCard r={result} />
             )}
 
-            {result && !loading && result.mode !== 'member_analysis' && (
+            {result && !loading && result.mode === 'report' && <GroupReport report={result.report} />}
+
+            {result && !loading && !['member_analysis', 'report'].includes(result.mode) && (
                 <div className="wq-result">
                     {result.answer && (
                         <div className="wq-answer">

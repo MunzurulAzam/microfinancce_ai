@@ -59,7 +59,7 @@ def preprocess_image(input_path: str) -> str:
 
 
 def analyze_document(image_path: str) -> dict:
-    """Two-step document classification using llava:7b vision model."""
+    """Two-step document classification using Ollama Cloud vision."""
     preprocessed_path = None
     try:
         preprocessed_path = preprocess_image(image_path)

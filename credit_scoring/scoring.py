@@ -13,7 +13,15 @@ def _to_float(val):
 
 
 def _score_overdue(data):
-    """1. Overdue (Previous Loan Cycle)"""
+    """1. Overdue (Previous Loan Cycle)
+    1tarik 5000
+    diche 3000
+    2 tarik over
+    8 5000
+    9 ov
+    15 1200
+    """
+
     cnt = data.get('prev_overdue_count', 0)
     if cnt == 0:
         return 5, "No overdue"

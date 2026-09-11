@@ -12,7 +12,7 @@ const EXTRACTOR_LABELS = {
     vision: 'Cloud Vision',
     claude: 'Claude Vision',
     easyocr: 'EasyOCR (offline)',
-    ollama: 'Ollama (local)',
+    ollama: 'Ollama Cloud',
 };
 
 const CONFIDENCE_CONFIG = {

@@ -6,7 +6,7 @@ from ask_ai import db, llm
 from ask_ai.cache import TTLCache
 from ask_ai.config import RESULT_CACHE_TTL
 from ask_ai.prompt import build_prompt, build_repair_prompt
-from ask_ai.sql_guard import has_country_filter, sanitize, strip_limit, UnsafeSQL
+from ask_ai.sql_guard import sanitize, strip_limit, UnsafeSQL
 
 _results = TTLCache(RESULT_CACHE_TTL, max_entries=128)
 
@@ -67,6 +67,12 @@ def is_member_analysis(question):
 
 
 def route(question, country=None, with_summary=True):
+    from reports.service import REPORT_NAMES, parse_question, create_report, ReportError, enrich_period_error
+    if REPORT_NAMES.search(question):
+        try:
+            return create_report(parse_question(question), country, with_summary)
+        except ReportError as error:
+            return dict(enrich_period_error(error, country).payload(), bad_request=error.status < 500)
     strong = _is_strong(question)
     if strong or _is_weak(question):
         from ask_ai.member_analysis import analyze_member
@@ -83,11 +89,11 @@ def _generate_sql(question, country):
     try:
         prompt = build_prompt(question, country)
     except db.QueryError as e:
-        return None, None, f'Warehouse unavailable: {e}', False
+        return None, None, {'error': 'Warehouse unavailable. Please retry later.', 'code': 'warehouse_unavailable', 'http_status': 503, 'retryable': True}, False
 
     result = llm.generate(prompt)
     if not result['success']:
-        return None, None, result['error'], False
+        return None, None, result, False
 
     raw = result['text']
     try:
@@ -105,7 +111,7 @@ def _repair_sql(question, sql, error, country):
     """One retry, handed the failed SQL and the server's own complaint."""
     result = llm.generate(build_repair_prompt(question, sql, error, country))
     if not result['success']:
-        return None, result['error']
+        return None, result
     try:
         return sanitize(strip_limit(result['text'] or ''), country=country), None
     except UnsafeSQL as e:
@@ -124,20 +130,9 @@ def ask(question, country=None, with_summary=True):
 
     sql, raw, error, caller_fault = _generate_sql(question, country)
     if not sql:
-        return {'success': False, 'error': error, 'sql': raw,
-                'bad_request': caller_fault}
-
-    country_enforced = has_country_filter(sql, country)
-    if country and not country_enforced:
-        scoped, _ = _repair_sql(
-            question, sql,
-            f"The answer must cover {country} only, but the query has no country "
-            f"filter. Add CountryCode = '{country}' to it.",
-            country)
-        if scoped and has_country_filter(scoped, country):
-            ok, _, _ = db.validate_sql(scoped)
-            if ok:
-                sql, country_enforced = scoped, True
+        if isinstance(error, dict):
+            return {k: v for k, v in dict(error, success=False, sql=raw, bad_request=caller_fault).items() if k != 'text'}
+        return {'success': False, 'error': error, 'sql': raw, 'bad_request': caller_fault}
 
     ok, validation_error, _ = db.validate_sql(sql)
     if not ok:
@@ -154,7 +149,7 @@ def ask(question, country=None, with_summary=True):
     try:
         columns, rows, truncated = db.run_sql(sql)
     except db.QueryError as e:
-        return {'success': False, 'error': f'SQL execution failed: {e}', 'sql': sql}
+        return {'success': False, 'error': 'Warehouse query failed. Please retry later.', 'code': 'warehouse_query_failed', 'http_status': 503, 'retryable': True, 'sql': sql}
 
     result = {
         'success': True,
@@ -167,7 +162,7 @@ def ask(question, country=None, with_summary=True):
         'truncated': truncated,
     }
     if country:
-        result['country_enforced'] = country_enforced
+        result['country_enforced'] = True
 
     if with_summary:
         result['answer'] = llm.summarize(question, columns, rows)
@@ -178,6 +173,8 @@ def ask(question, country=None, with_summary=True):
 
 def _invalid(question, sql, error, repaired, repair_error):
     """Return both failed attempts so a bad generation is easy to turn into a new example."""
+    if isinstance(repair_error, dict):
+        return dict(repair_error, success=False, question=question, sql=sql)
     return {
         'success': False,
         'question': question,

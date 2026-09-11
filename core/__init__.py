@@ -1,1 +1,1 @@
-"""Shared, cross-feature utilities (e.g. the local LLM handler)."""
+"""Shared, cross-feature utilities (e.g. the cloud AI client)."""

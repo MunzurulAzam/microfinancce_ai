@@ -23,13 +23,6 @@ MAX_RESULT_ROWS = int(os.environ.get('ASK_AI_MAX_ROWS', 1000))
 SCHEMA_CACHE_TTL = int(os.environ.get('ASK_AI_SCHEMA_TTL', 3_600))
 RESULT_CACHE_TTL = int(os.environ.get('ASK_AI_RESULT_TTL', 300))
 
-OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
-
-ASK_AI_MODEL = os.environ.get('ASK_AI_MODEL', 'qwen2.5:7b-instruct')
-
-OLLAMA_KEEP_ALIVE = os.environ.get('ASK_AI_KEEP_ALIVE', '30m')
-
-
 TABLE_ALLOWLIST = (
     'MfMember',
     'MfMemberAdditionalInfo',
@@ -63,3 +56,14 @@ TABLE_ALLOWLIST = (
 # Surrogate keys, image paths and GUIDs cost prompt tokens and invite mis-joins.
 HIDDEN_COLUMNS = ('DwId', 'ImageUrl', 'IdImage', 'DisburseImage', 'GroupPhotoPath')
 HIDDEN_COLUMN_SUFFIXES = ('Uid',)
+
+# ── Dify external knowledge API ──────────────────────────────────────────────
+# Dify calls POST /api/dify/retrieval with a Bearer key and one of these ids.
+DIFY_KB_API_KEY   = os.environ.get('DIFY_KB_API_KEY', '')
+DIFY_LIVE_KB_ID   = os.environ.get('DIFY_LIVE_KB_ID', 'dw-live')
+DIFY_SCHEMA_KB_ID = os.environ.get('DIFY_SCHEMA_KB_ID', 'dw-schema')
+
+DIFY_MAX_TOP_K = int(os.environ.get('DIFY_MAX_TOP_K', 10))
+
+# Rows rendered into a record — the whole record has to fit an LLM context.
+DIFY_TABLE_ROWS = int(os.environ.get('DIFY_TABLE_ROWS', 50))

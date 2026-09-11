@@ -5,7 +5,7 @@ import re
 from ask_ai import schema as schema_mod
 from ask_ai.glossary import GLOSSARY, JOIN_RULES, METRIC_CTES, examples_text
 
-# Only plausibly-needed tables are described — the full DDL is ~12k chars.
+# Only plausibly-needed tables are described
 _CORE_TABLES = ['MfMember', 'MfLoan']
 
 _TABLE_KEYWORDS = {

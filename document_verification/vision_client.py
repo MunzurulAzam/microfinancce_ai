@@ -1,124 +1,19 @@
-"""Shared vision-LLM client for the passport/NID classifier and the NID/VoterID scanner."""
+"""Cloud vision transport and response parsers."""
 import base64
 import json as _json
 import re
-import time
 from typing import Optional
-
-import requests
-from config import Config
-
-# Free Ollama Cloud briefly returns 503/429 under load — retry with a short backoff.
-_RETRY_STATUSES = {429, 503}
-_MAX_RETRIES = 3
-_RETRY_BACKOFF_SEC = 4
+from core.cloud import generate
 
 
-def encode_image(path: str) -> str:
-    with open(path, 'rb') as f:
-        return base64.b64encode(f.read()).decode('utf-8')
+def encode_image(path):
+    with open(path, 'rb') as image:
+        return base64.b64encode(image.read()).decode('ascii')
 
 
-def _vision_models() -> list:
-    """OLLAMA_VISION_MODEL first, then the comma-separated OLLAMA_VISION_FALLBACKS."""
-    models = [Config.OLLAMA_VISION_MODEL]
-    fallbacks = getattr(Config, 'OLLAMA_VISION_FALLBACKS', '') or ''
-    for m in fallbacks.split(','):
-        m = m.strip()
-        if m and m not in models:
-            models.append(m)
-    return models
-
-
-def call_vision(
-    image_b64: str,
-    prompt: str,
-    *,
-    num_predict: int = 256,
-    temperature: float = 0.1,
-    timeout: int = 120,
-) -> dict:
-    """Vision call against {OLLAMA_BASE_URL}/api/chat."""
-    last_error = None
-    overloaded = False
-    any_reachable = False
-    for model in _vision_models():
-        result = _call_one_model(model, image_b64, prompt, num_predict, temperature, timeout)
-        if result['success']:
-            return result
-        last_error = result['error']
-        overloaded = overloaded or result.get('overloaded', False)
-        if result.get('fatal'):
-            return {'success': False, 'text': None, 'error': last_error,
-                    'overloaded': False, 'unavailable': True}
-        if not result.get('not_found'):
-            any_reachable = True
-    return {'success': False, 'text': None, 'error': last_error,
-            'overloaded': overloaded, 'unavailable': not any_reachable}
-
-
-def _call_one_model(model, image_b64, prompt, num_predict, temperature, timeout) -> dict:
-    payload = {
-        'model': model,
-        'messages': [
-            {'role': 'user', 'content': prompt, 'images': [image_b64]},
-        ],
-        'stream': False,
-        'options': {'temperature': temperature, 'num_predict': num_predict},
-    }
-
-    last_status_error = None
-    for attempt in range(_MAX_RETRIES):
-        try:
-            resp = requests.post(
-                f'{Config.OLLAMA_BASE_URL}/api/chat',
-                json=payload,
-                timeout=timeout,
-            )
-        except requests.exceptions.ConnectionError:
-            return {
-                'success': False, 'text': None, 'fatal': True,
-                'error': (
-                    'Ollama is not running. Start Ollama and ensure the vision '
-                    f'model is available. Run: ollama pull {model}{_cloud_hint(model)}'
-                ),
-            }
-        except requests.exceptions.Timeout:
-            return {
-                'success': False, 'text': None, 'fatal': True,
-                'error': 'The vision model took too long to respond (it may still be loading).',
-            }
-
-        if resp.status_code == 200:
-            data = resp.json()
-            text = (data.get('message') or {}).get('content', '')
-            return {'success': True, 'text': text, 'error': None}
-
-        body = resp.text[:400]
-        if 'not found' in body.lower() or resp.status_code == 404:
-            return {
-                'success': False, 'text': None, 'not_found': True,
-                'error': (
-                    f'Vision model "{model}" is not available. '
-                    f'Run: ollama pull {model}{_cloud_hint(model)}'
-                ),
-            }
-
-        last_status_error = f'[{model}] Ollama HTTP {resp.status_code}: {body}'
-        if resp.status_code in _RETRY_STATUSES and attempt < _MAX_RETRIES - 1:
-            time.sleep(_RETRY_BACKOFF_SEC * (attempt + 1))
-            continue
-        overloaded = resp.status_code in _RETRY_STATUSES
-        return {'success': False, 'text': None,
-                'error': last_status_error, 'overloaded': overloaded}
-
-    return {'success': False, 'text': None, 'error': last_status_error}
-
-
-def _cloud_hint(model: str) -> str:
-    if model.endswith('-cloud') or model.endswith(':cloud'):
-        return ' (cloud model — also run `ollama signin` once)'
-    return ''
+def call_vision(image_b64, prompt, *, num_predict=1024, temperature=0.1, timeout=60, json_mode=False):
+    return generate(prompt, task='vision', images=[image_b64], num_predict=num_predict,
+                    temperature=temperature, timeout=timeout, json_mode=json_mode)
 
 
 def parse_possibly_truncated_json(candidate: str) -> Optional[dict]:

@@ -4,14 +4,14 @@ Ask a question in plain English, get a real answer computed from real data.
 
 ```
 question ─▶ prompt (schema + glossary + few-shot)
-         ─▶ local Ollama writes T-SQL
+         ─▶ Ollama Cloud writes T-SQL
          ─▶ guardrail (SELECT-only, single statement, TOP cap, country filter)
          ─▶ dry-run validation on DW  ──(error)──▶ one repair retry
          ─▶ execute on DW inside a rolled-back transaction
          ─▶ answer + table
 ```
 
-**The model only ever writes SQL.** Every number in an answer comes straight from
+**For warehouse Q&A, the model writes SQL and summarizes results.** Every number in an answer comes straight from
 DW, because an LLM that invents figures is useless — and dangerous — in finance.
 
 ## Why not fine-tune a model on the data?
@@ -49,13 +49,15 @@ add staleness and a nightly ETL to maintain, and buy nothing.
 | `engine.py` | Orchestration: route → generate → validate → repair → execute |
 | `member_analysis.py` | The other branch: credit score + decision for one member |
 | `api.py` | Flask blueprint `POST /api/ask-ai` |
+| `dify.py` | Flask blueprint `POST /api/dify/retrieval` — Dify external knowledge API |
+| `dify_records.py` | Turns an engine answer / the schema into Dify `records` |
 | `check_examples.py` | Self-check: runs every example against DW + asserts routing |
 
 ## Setup
 
 ```bash
 cp .env.example .env      # then fill in DW_* credentials
-ollama pull qwen2.5:7b-instruct
+# set OLLAMA_API_KEY in .env (no local Ollama install needed)
 python app.py
 ```
 
@@ -79,6 +81,50 @@ different country.
 
 Response: `{success, question, sql, columns, rows, row_count, answer, mode}`.
 The `sql` is always returned so a wrong answer is easy to diagnose.
+
+## Dify external knowledge base
+
+Dify can use this warehouse as an **external knowledge base**: for every user
+message it POSTs `{endpoint}/retrieval`, and whatever `records` come back are
+injected into its LLM's context. One endpoint serves two knowledge bases:
+
+| `knowledge_id` | Records returned |
+|---|---|
+| `dw-live` | The question run through `engine.route()` — answer sentence, result rows as a markdown table, and the SQL. Live numbers. |
+| `dw-schema` | Business rules (`GLOSSARY`), verified example SQL, and `CREATE TABLE` DDL for the tables the question routes to. |
+
+`dw-schema` ranks records with the same keyword routing the prompt uses, not
+embedding similarity — scores are stable, not cosine distances.
+
+Set `DIFY_KB_API_KEY` in `.env` (empty key = endpoint closed, never open) and
+test it locally:
+
+```bash
+curl -X POST http://localhost:5001/api/dify/retrieval \
+  -H 'Authorization: Bearer <DIFY_KB_API_KEY>' \
+  -H 'Content-Type: application/json' \
+  -d '{"knowledge_id": "dw-live", "query": "Total outstanding portfolio by country?",
+       "retrieval_setting": {"top_k": 5, "score_threshold": 0.2}}'
+```
+
+A country filter arrives as Dify's `metadata_condition` — a condition named
+`country` with value `UG` / `KY` / `ZM` / `TZ` — and is passed to the engine as
+the same hard `country` filter `/api/ask-ai` uses.
+
+Wiring it up in Dify: **Knowledge → External Knowledge API → Add**, with
+`API Endpoint` = `https://<public-host>/api/dify` (Dify appends `/retrieval`
+itself) and the API key. Then **Create Knowledge → Connect to an External
+Knowledge Base**, with Knowledge ID `dw-live` or `dw-schema`.
+
+Dify Cloud cannot reach `localhost`, so expose the server first — e.g.
+`ngrok http 5001` — and update the endpoint whenever the tunnel URL changes.
+Behind a public tunnel, run Flask with `debug=False`.
+
+A question the engine cannot answer returns `200 {"records": []}`, not an error:
+Dify treats any non-200 as a hard failure, and no context is better than a dead
+workflow. The reason is logged server-side. Auth and knowledge-id problems do
+use Dify's own codes — `1001` bad header, `1002` wrong key, `2001` unknown
+knowledge id.
 
 ## Improving accuracy
 
@@ -140,3 +186,9 @@ layers before anything touches the server:
 `AcVoucherMaster` / `AcVoucherDetail` (44M / 109M rows, clustered PK only) are
 deliberately left out of the allowlist — any ad-hoc aggregate over them is a
 guaranteed full scan.
+
+## Named management reports
+
+Ask `Group Performance Report August 2026` for a structured preview and PDF.
+The report route uses fixed historical queries and a saved snapshot.
+See [the report API contract](../docs/report-api.md) for model setup, data definitions, FX configuration and .NET examples.
