@@ -22,8 +22,14 @@ ROUTING_CASES = [
     ('list all users in Nyangusu branch', False),
     ('analyze member CLN0189567', True),
     ('can CLN0049681 get a loan?', True),
-    ('all loans of CLN0189567', True),
+    ('all loans of CLN0189567', False),
     ('analyze client Jesca Acam', True),
+    ('now give me details for this member: CLN0000109', True),
+    ('now give me information of this CLN0000109 member report', True),
+    ('give me information of CLN0000109 this client', True),
+    ('give me group size of this CLN0000109 client', False),
+    ('what is the phone number of CLN0189567', False),
+    ('which group is CLN0189567 in', False),
 ]
 
 

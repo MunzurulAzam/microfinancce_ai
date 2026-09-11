@@ -9,6 +9,7 @@ MAX_TEXT = 1500
 MAX_CONTEXT_BYTES = 14000
 CODES = {'ALL', 'UG', 'KY', 'TZ', 'ZM'}
 META_FIELDS = {'report_type', 'period', 'country', 'entity', 'resolved_question'}
+MEMBER_CODE = re.compile(r'\bCLN\d+\b', re.I)
 REFERENCE = re.compile(r'\b(it|its|his|her|their|that|those|them|same|instead|previous|again|now|what about|how about|more|why)\b|এবার|এটা|এটি|ওটা|আগের|আরও|সেটা|একই|কেন', re.I)
 
 
@@ -57,6 +58,9 @@ def resolve(question, context=None, country=None):
     if country is not None and (not isinstance(country, str) or country.strip().upper() not in CODES):
         raise ContextError('country must be UG, KY, TZ, ZM or ALL.')
     country = country.strip().upper() if country else None
+    # An explicit member code is a complete reference, so it is never rewritten.
+    if MEMBER_CODE.search(question):
+        return question, country, None
     if not history:
         if re.search(r'\b(that|those|them|previous|same)\b|এটা|এটি|ওটা|আগের|সেটা|একই', question, re.I):
             return question, country, clarification('Please include the full report, member or result you mean; this chat has no earlier context.')

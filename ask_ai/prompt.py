@@ -67,7 +67,17 @@ def select_tables(question):
     return chosen or list(available)
 
 
-def build_prompt(question, country=None):
+def _member_scope(member):
+    if not member:
+        return ''
+    member_id, code = member.get('MemberId'), member.get('CountryCode')
+    return (f"This question is about ONE member: MemberId {member_id}, MemberCode "
+            f"{member.get('MemberCode')}, CountryCode {code}, GroupId {member.get('GroupId')}. "
+            f"Identify them with MemberId = {member_id} AND CountryCode = '{code}' "
+            "(MemberCode repeats across countries). Answer only what is asked about this member.")
+
+
+def build_prompt(question, country=None, member=None):
     tables = select_tables(question)
     schema_text = schema_mod.get_schema_text(tables)
 
@@ -94,6 +104,8 @@ def build_prompt(question, country=None):
         f"- {scope}",
         GLOSSARY,
     ]
+    if member:
+        blocks.insert(2, _member_scope(member))
     if any(kw in question.lower() for kw in _CTE_KEYWORDS):
         blocks.append(METRIC_CTES)
     blocks.append(f"Database schema:\n{schema_text}")
@@ -120,12 +132,14 @@ def _column_hint(error, tables):
             "Join to one of those instead of inventing the column.\n")
 
 
-def build_repair_prompt(question, sql, error, country=None):
+def build_repair_prompt(question, sql, error, country=None, member=None):
 
     tables = select_tables(question)
     return (
         "The following Microsoft SQL Server query failed. Fix it.\n\n"
         f"Question: {question}\n\n"
+        + (f"{_member_scope(member)}\n\n" if member else "")
+        + f"Failed SQL:\n{sql}\n\n"
         f"Failed SQL:\n{sql}\n\n"
         f"SQL Server error:\n{error}\n"
         f"{_column_hint(error, tables)}\n"

@@ -307,14 +307,18 @@ suggested amount, and give 2-3 concrete suggestions to reduce risk."""
             f"Suggested amount: {amount['recommended_amount']:,.0f}.")
 
 
+def not_found(query, ref, country=None):
+    return {'success': False, 'mode': 'member_analysis',
+            'error': f'No member found matching "{ref or query}".',
+            'suggestions': suggest_members(query, country),
+            'bad_request': True}
+
+
 def analyze_member(query, country=None):
     ref = extract_member_ref(query)
     matches = resolve_member(ref, country)
     if not matches:
-        return {'success': False, 'mode': 'member_analysis',
-                'error': f'No member found matching "{ref or query}".',
-                'suggestions': suggest_members(query, country),
-                'bad_request': True}
+        return not_found(query, ref, country)
 
     member = matches[0]
     try:

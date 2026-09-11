@@ -439,7 +439,7 @@ def ask_endpoint():
         question = data['question']
         if not isinstance(question, str) or not question.strip():
             return jsonify({'success': False, 'error': 'question must be a nonempty string.'}), 400
-        from core.conversation import resolve, attach, ContextError
+        from core.conversation import resolve, attach, ContextError, MEMBER_CODE
         try:
             question, effective_country, context_response = resolve(question, data.get('context'), data.get('country'))
         except ContextError as error:
@@ -447,7 +447,7 @@ def ask_endpoint():
         if context_response is not None:
             return jsonify(attach(context_response, question, effective_country)), 200
         from reports.service import REPORT_NAMES
-        if REPORT_NAMES.search(question) or effective_country not in (None, 'ALL'):
+        if REPORT_NAMES.search(question) or MEMBER_CODE.search(question) or effective_country not in (None, 'ALL'):
             from ask_ai.engine import route
             if not isinstance(data.get('summary', True), bool):
                 return jsonify({'success': False, 'error': 'summary must be a boolean.'}), 400
